@@ -4,16 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
-<title data-i18n-text="setup.document.title">NIM Proxy — First-time setup</title>
+<title data-i18n-text="setup.document.title">Open Proxy — First-time setup</title>
 <link id="presentation-stylesheet" rel="stylesheet" href="/assets/public/public.css">
 <noscript><link rel="stylesheet" href="/assets/public/noscript.css"></noscript>
 </head>
 <body hidden>
 <main>
 <form class="card" id="wiz" action="/setup" method="post" autocomplete="off">
-  <h1><span class="brand">NIM</span> PROXY <span data-i18n="setup.header.title">— First-time setup</span></h1>
-  <p class="sub" data-i18n="setup.header.subtitle">Complete setup: create the superuser account and add at least one NIM API key.</p>
-  <div class="steps"><span id="s1" class="on" data-n="1" data-i18n="setup.stepper.step1">Create account</span><span id="s2" data-n="2" data-i18n="setup.stepper.step2">Add NIM API keys</span><span id="s3" data-n="3" data-i18n="setup.stepper.step3">Review &amp; finish</span></div>
+  <h1><span class="brand" data-i18n="common.app_name">Open Proxy</span> <span data-i18n="setup.header.title">— First-time setup</span></h1>
+  <p class="sub" data-i18n="setup.header.subtitle">Complete setup: create the superuser account and add at least one API key.</p>
+  <div class="steps"><span id="s1" class="on" data-n="1" data-i18n="setup.stepper.step1">Create account</span><span id="s2" data-n="2" data-i18n="setup.stepper.step2">Add API keys</span><span id="s3" data-n="3" data-i18n="setup.stepper.step3">Review &amp; finish</span></div>
   <p class="err" id="err"></p>
 
   <section id="step1">
@@ -28,24 +28,14 @@
   </section>
 
   <section id="step2" hidden>
-    <ul class="keys" id="keylist"></ul>
-    <div class="addrow">
-      <label class="noscript-fallback" for="newkey" hidden data-i18n="setup.step2.key_label">NIM API key</label>
-      <input class="key" id="newkey" name="nim_key" type="password" placeholder="nvapi-…" data-i18n-attr="aria-label:setup.step2.key_label">
-      <label class="noscript-fallback" for="newrpm" hidden data-i18n="setup.step2.rpm_label">Requests per minute</label>
-      <input class="rpm" id="newrpm" name="nim_rpm" type="number" value="40" min="1" max="10000" title="requests/min" data-i18n-attr="aria-label:setup.step2.rpm_label">
-      <button type="button" class="ghost" id="addkey" data-i18n="setup.step2.addkey">Validate &amp; add</button>
-    </div>
-    <details>
-      <summary data-i18n="setup.step2.advanced">Advanced — upstream base URL</summary>
-      <label class="noscript-fallback" for="baseurl" hidden data-i18n="setup.step2.base_url">Upstream base URL</label>
-      <input id="baseurl" name="base_url" placeholder="https://integrate.api.nvidia.com" data-i18n-attr="aria-label:setup.step2.base_url">
-    </details>
+    <div id="groups"></div>
+    <button type="button" class="ghost" id="addgroup" data-i18n="setup.step2.add_group">Add another provider</button>
     <div class="row">
       <button type="button" class="ghost" id="back1" data-i18n="setup.wizard.back">Back</button>
       <button type="button" class="primary" id="to3" disabled data-i18n="setup.wizard.continue">Continue</button>
     </div>
-    <p class="hint" data-i18n="setup.step2.hint">NIM API keys are shared across clients. The default rate limit is 40 requests/min per key.</p>
+    <p class="hint noscript-fallback" hidden data-i18n="setup.step2.group_hint">For multiple providers, enable JavaScript.</p>
+    <p class="hint" data-i18n="setup.step2.hint">API keys are shared across clients. The default rate limit is 40 requests/min per key.</p>
   </section>
 
   <section id="step3" hidden>

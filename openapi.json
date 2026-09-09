@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "nim-proxy dashboard API",
-    "description": "The operator surface of nim-proxy: the settings store, user and key management, and the metrics history the dashboard renders. This document is generated from the handlers; regenerate it with `UPDATE_OPENAPI=1 cargo test --test openapi`.\n\nNot covered: the OpenAI-compatible `/v1` passthrough (that contract is the upstream's, not nim-proxy's), the HTML page routes, the form-encoded `/login` and `/logout` browser flow, plain-text `/health`, and the Prometheus exposition at `/metrics`.",
+    "title": "open-proxy dashboard API",
+    "description": "The operator surface of open-proxy: the settings store, user and key management, and the metrics history the dashboard renders. This document is generated from the handlers; regenerate it with `UPDATE_OPENAPI=1 cargo test --test openapi`.\n\nNot covered: the OpenAI-compatible `/v1` passthrough (that contract is the upstream's, not nim-proxy's), the HTML page routes, the form-encoded `/login` and `/logout` browser flow, plain-text `/health`, and the Prometheus exposition at `/metrics`.",
     "contact": {
       "name": "nim-proxy",
       "url": "https://github.com/miztertea/nim-proxy"
@@ -596,12 +596,73 @@
         }
       }
     },
+    "/api/settings/models": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "`POST /api/settings/models` (admin) — toggle which models the proxy\nserves. The list is a full replacement so a dashboard checkbox syncs with\none request; entries use the model-id charset and are capped at 256.",
+        "operationId": "models_cfg",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelsReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Applied; the model catalog cache was flushed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The store validator rejected the list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session, or the caller's user was deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Server settings require an admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings/nim-keys": {
       "post": {
         "tags": [
           "settings"
         ],
-        "summary": "`POST /api/settings/nim-keys` — any role may add keys (owner = caller)\nand manage their OWN keys; admins manage any key. The superuser's last\nenabled key is protected by `validate` (the pool-floor invariant).",
+        "summary": "`POST /api/settings/nim-keys` — any role may add keys (owner = caller)\nand manage their OWN keys; admins manage any key. Keys are scoped to an\nendpoint group (`upstream`, default `nvidia`); fingerprints are globally\nunique so remove/set need no group. The pool floor spans groups: the\nvalidator refuses to strand the superuser without an enabled key on an\nenabled group.",
         "operationId": "nim_keys",
         "requestBody": {
           "content": {
@@ -625,7 +686,7 @@
             }
           },
           "400": {
-            "description": "No such key, more than one action, or a store the validator rejects (e.g. removing the pool floor)",
+            "description": "No such key, unknown group, more than one action, or a store the validator rejects (e.g. removing the pool floor)",
             "content": {
               "application/json": {
                 "schema": {
@@ -789,12 +850,73 @@
         }
       }
     },
+    "/api/settings/upstreams": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "`POST /api/settings/upstreams` (admin) — manage the extra\nOpenAI-compatible endpoint groups: add a custom API, remove one (its keys\nleave the pool), or toggle it / retarget it / repin its models. The\nprimary `nvidia` group can be toggled and repinned here but never removed\n(disable it instead). Commits flush the model-catalog cache and the\nper-model no-inject memory, which are upstream-specific.",
+        "operationId": "upstreams",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpstreamsReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Applied; the pool was rebuilt and upstream caches were flushed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown group, more than one action, or a store the validator rejects",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session, or the caller's user was deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Server settings require an admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings/users": {
       "post": {
         "tags": [
           "settings"
         ],
-        "summary": "`POST /api/settings/users` (admin) — create/delete users, reset\npasswords, change roles. Deleting a user pulls their NIM keys from the\npool and revokes their client keys — their harnesses stop; that's the\npoint. The superuser can never be deleted or demoted.",
+        "summary": "`POST /api/settings/users` (admin) — create/delete users, reset\npasswords, change roles. Deleting a user pulls their API keys from the\npool and revokes their client keys — their harnesses stop; that's the\npoint. The superuser can never be deleted or demoted.",
         "operationId": "users",
         "requestBody": {
           "content": {
@@ -855,7 +977,7 @@
         "tags": [
           "settings"
         ],
-        "summary": "`POST /api/settings/validate-key` — authenticated twin of the setup\nprobe. The upstream is ALWAYS the configured `base_url`, never a\ncaller-supplied one: a request-supplied target would let any logged-in\nuser turn the proxy into an SSRF probe of internal hosts (the response\ndistinguishes reachable/rejected/unreachable). An admin testing a new\nupstream saves it first, then validates. `req.base_url` is ignored.",
+        "summary": "`POST /api/settings/validate-key` — authenticated twin of the setup\nprobe. The upstream is ALWAYS a configured group (`upstream`, default the\nprimary `nvidia`), never a caller-supplied URL: a request-supplied target\nwould let any logged-in user turn the proxy into an SSRF probe of\ninternal hosts (the response distinguishes reachable/rejected/\nunreachable). An admin testing a brand-new API saves the group first,\nthen validates. `req.base_url` is ignored.",
         "operationId": "validate_key",
         "requestBody": {
           "content": {
@@ -869,11 +991,21 @@
         },
         "responses": {
           "200": {
-            "description": "Probe finished against the CONFIGURED upstream; any `base_url` in the body is ignored (SSRF guard)",
+            "description": "Probe finished against the CONFIGURED group; any `base_url` in the body is ignored (SSRF guard)",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidateKeyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown endpoint group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             }
@@ -896,7 +1028,7 @@
         "tags": [
           "setup"
         ],
-        "summary": "`POST /setup` — one atomic claim: create the superuser, record the\ninitial NIM keys, persist, and mint a session. No half-configured server\nstate exists at any point; an abandoned wizard leaves nothing behind.",
+        "summary": "`POST /setup` — one atomic claim: create the superuser, record the\ninitial API keys, persist, and mint a session. No half-configured server\nstate exists at any point; an abandoned wizard leaves nothing behind.",
         "operationId": "setup_submit",
         "requestBody": {
           "content": {
@@ -1085,8 +1217,42 @@
               "integer",
               "null"
             ],
-            "description": "Requests per minute for this key's lane; defaults to 40 (NIM's free\ntier).",
+            "description": "Requests per minute for this key's lane; defaults to 40 (the\nupstream's free-tier default).",
             "minimum": 0
+          },
+          "upstream": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Endpoint group to add the key to; defaults to the primary group.\nAny OpenAI-compatible group name works — the key is just a bearer\nlane against that group's `base_url`."
+          }
+        }
+      },
+      "AddUpstream": {
+        "type": "object",
+        "required": [
+          "name",
+          "base_url"
+        ],
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "description": "`http(s)://host[:port]`; link-local addresses are refused."
+          },
+          "models": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "Model allowlist; omitted or empty serves any model."
+          },
+          "name": {
+            "type": "string",
+            "description": "Group id (`nvidia` is reserved for the primary group)."
           }
         }
       },
@@ -1237,11 +1403,13 @@
         "description": "The Settings page's data source. `server` and `users` are absent — not\nnull — for non-admin callers: the filtering happens before serialization,\nso DOM tampering reveals nothing.",
         "required": [
           "client_keys",
+          "disabled_models",
           "locale",
           "mode",
           "nim_keys",
           "pool",
           "role",
+          "upstreams",
           "username"
         ],
         "properties": {
@@ -1249,6 +1417,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ClientKeyRow"
+            }
+          },
+          "disabled_models": {
+            "type": "array",
+            "items": {
+              "type": "string"
             }
           },
           "locale": {
@@ -1275,6 +1449,12 @@
           "server": {
             "$ref": "#/components/schemas/ServerSettings",
             "description": "Admin-only; omitted entirely for the `user` role."
+          },
+          "upstreams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpstreamRow"
+            }
           },
           "username": {
             "type": "string"
@@ -1865,16 +2045,32 @@
           "keyed"
         ]
       },
+      "ModelsReq": {
+        "type": "object",
+        "required": [
+          "disabled"
+        ],
+        "properties": {
+          "disabled": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Full replacement of the globally toggled-off model list. Disabled\nmodels vanish from the merged `/v1/models` catalog and are rejected\nwith `model_disabled` before queueing."
+          }
+        }
+      },
       "NimKeyRow": {
         "type": "object",
-        "description": "A stored NIM key plus its live lane state. `lane`, `in_window` and\n`cooldown_ms` are null for a disabled key (it holds no lane).",
+        "description": "A stored API key plus its live lane state. `lane`, `in_window` and\n`cooldown_ms` are null for a disabled key (it holds no lane). `upstream`\nnames the endpoint group the key belongs to (`nvidia` = primary).",
         "required": [
           "enabled",
           "fingerprint",
           "guarded",
           "last4",
           "owner",
-          "rpm"
+          "rpm",
+          "upstream"
         ],
         "properties": {
           "cooldown_ms": {
@@ -1919,6 +2115,9 @@
           "rpm": {
             "type": "integer",
             "minimum": 0
+          },
+          "upstream": {
+            "type": "string"
           }
         }
       },
@@ -2066,7 +2265,7 @@
             "properties": {
               "base_url": {
                 "type": "string",
-                "description": "`http(s)://host[:port]`; link-local addresses are refused (cloud\nmetadata endpoints have no legitimate NIM use)."
+                "description": "`http(s)://host[:port]`; link-local addresses are refused (cloud\nmetadata endpoints have no legitimate upstream use)."
               }
             }
           }
@@ -2156,6 +2355,60 @@
           }
         }
       },
+      "SetUpstream": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "base_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "models": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "Full replacement of the group's model allowlist (empty = any model)."
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "SetupGroup": {
+        "type": "object",
+        "required": [
+          "name",
+          "base_url"
+        ],
+        "properties": {
+          "base_url": {
+            "type": "string"
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SetupKey"
+            }
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "SetupKey": {
         "type": "object",
         "required": [
@@ -2197,6 +2450,13 @@
                 "description": "Mint a first client key with the claim (the wizard sends this by\ndefault) so a fresh keyed-mode proxy can serve /v1 immediately."
               }
             ]
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SetupGroup"
+            },
+            "description": "Multi-provider groups. When non-empty, each group becomes an\n`UpstreamEndpoint` (the primary `upstream` gets the first group's\nkeys; remaining groups go into `upstreams`). Legacy single-group\npayloads leave this empty."
           },
           "nim_keys": {
             "type": "array",
@@ -2270,7 +2530,72 @@
         "properties": {
           "base_url": {
             "type": "string",
-            "description": "`http(s)://host[:port]`; link-local addresses are refused (cloud\nmetadata endpoints have no legitimate NIM use)."
+            "description": "`http(s)://host[:port]`; link-local addresses are refused (cloud\nmetadata endpoints have no legitimate upstream use)."
+          }
+        }
+      },
+      "UpstreamRow": {
+        "type": "object",
+        "description": "One endpoint group: an OpenAI-compatible API plus the keys that serve\nit. `models` is the group's allowlist — empty serves any model.",
+        "required": [
+          "base_url",
+          "enabled",
+          "keys",
+          "models",
+          "name"
+        ],
+        "properties": {
+          "base_url": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "keys": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "UpstreamsReq": {
+        "type": "object",
+        "description": "Exactly one of `add` / `remove` / `set` per request.",
+        "properties": {
+          "add": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AddUpstream"
+              }
+            ]
+          },
+          "remove": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name of the endpoint group to remove (its keys leave the pool)."
+          },
+          "set": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SetUpstream"
+              }
+            ]
           }
         }
       },
@@ -2319,7 +2644,7 @@
               "string",
               "null"
             ],
-            "description": "Username to delete. Their NIM keys leave the pool and their client\nkeys are revoked."
+            "description": "Username to delete. Their API keys leave the pool and their client\nkeys are revoked."
           },
           "reset_password": {
             "oneOf": [
@@ -2358,7 +2683,14 @@
           },
           "key": {
             "type": "string",
-            "description": "The NIM key to probe."
+            "description": "The API key to probe."
+          },
+          "upstream": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Authenticated twin only: probe against this endpoint group's\n`base_url` instead of the primary's. Pre-claim there are no groups,\nso `/setup/validate-key` rejects it."
           }
         }
       },

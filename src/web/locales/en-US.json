@@ -3,9 +3,9 @@
   "state": "Source",
   "messages": {
     "common.app_name": {
-      "en": "NIM Proxy",
+      "en": "Open Proxy",
       "desc": "Product name.",
-      "hash": "1e2b099a"
+      "hash": "b9bf6c24"
     },
     "dashboard.brand.proxy": {
       "en": "Proxy",
@@ -88,32 +88,32 @@
     },
     "dashboard.capacity.note.enabled_keys.few": {
       "en": "{n} enabled keys",
-      "desc": "CLDR plural category 'few' of the sub-label under the saturation bar. {n} is the count of enabled upstream NIM API keys and must stay a placeholder. English distinguishes only 'one' and 'other', so this form repeats the English of 'other' — do not assume the categories are identical in your language.",
+      "desc": "CLDR plural category 'few' of the sub-label under the saturation bar. {n} is the count of enabled upstream API keys and must stay a placeholder. English distinguishes only 'one' and 'other', so this form repeats the English of 'other' — do not assume the categories are identical in your language.",
       "hash": "8d762678"
     },
     "dashboard.capacity.note.enabled_keys.many": {
       "en": "{n} enabled keys",
-      "desc": "CLDR plural category 'many' of the sub-label under the saturation bar. {n} is the count of enabled upstream NIM API keys and must stay a placeholder. English distinguishes only 'one' and 'other', so this form repeats the English of 'other' — do not assume the categories are identical in your language.",
+      "desc": "CLDR plural category 'many' of the sub-label under the saturation bar. {n} is the count of enabled upstream API keys and must stay a placeholder. English distinguishes only 'one' and 'other', so this form repeats the English of 'other' — do not assume the categories are identical in your language.",
       "hash": "8d762678"
     },
     "dashboard.capacity.note.enabled_keys.one": {
       "en": "{n} enabled key",
-      "desc": "CLDR plural category 'one' of the sub-label under the saturation bar. {n} is the count of enabled upstream NIM API keys and must stay a placeholder. This is the singular English uses for exactly 1.",
+      "desc": "CLDR plural category 'one' of the sub-label under the saturation bar. {n} is the count of enabled upstream API keys and must stay a placeholder. This is the singular English uses for exactly 1.",
       "hash": "9aae9534"
     },
     "dashboard.capacity.note.enabled_keys.other": {
       "en": "{n} enabled keys",
-      "desc": "CLDR plural category 'other' of the sub-label under the saturation bar. {n} is the count of enabled upstream NIM API keys and must stay a placeholder. English uses this form for every count except 1, including 0.",
+      "desc": "CLDR plural category 'other' of the sub-label under the saturation bar. {n} is the count of enabled upstream API keys and must stay a placeholder. English uses this form for every count except 1, including 0.",
       "hash": "8d762678"
     },
     "dashboard.capacity.note.enabled_keys.two": {
       "en": "{n} enabled keys",
-      "desc": "CLDR plural category 'two' of the sub-label under the saturation bar. {n} is the count of enabled upstream NIM API keys and must stay a placeholder. English distinguishes only 'one' and 'other', so this form repeats the English of 'other' — do not assume the categories are identical in your language.",
+      "desc": "CLDR plural category 'two' of the sub-label under the saturation bar. {n} is the count of enabled upstream API keys and must stay a placeholder. English distinguishes only 'one' and 'other', so this form repeats the English of 'other' — do not assume the categories are identical in your language.",
       "hash": "8d762678"
     },
     "dashboard.capacity.note.enabled_keys.zero": {
       "en": "{n} enabled keys",
-      "desc": "CLDR plural category 'zero' of the sub-label under the saturation bar. {n} is the count of enabled upstream NIM API keys and must stay a placeholder. English distinguishes only 'one' and 'other', so this form repeats the English of 'other' — do not assume the categories are identical in your language.",
+      "desc": "CLDR plural category 'zero' of the sub-label under the saturation bar. {n} is the count of enabled upstream API keys and must stay a placeholder. English distinguishes only 'one' and 'other', so this form repeats the English of 'other' — do not assume the categories are identical in your language.",
       "hash": "8d762678"
     },
     "dashboard.capacity.note.rpm_available": {
@@ -247,7 +247,7 @@
     },
     "dashboard.common.col.key": {
       "en": "Key",
-      "desc": "Table column header. An upstream NIM API key. Not a keyboard key or a map key.",
+      "desc": "Table column header. An upstream API key. Not a keyboard key or a map key.",
       "hash": "99a52df3"
     },
     "dashboard.common.col.model": {
@@ -1109,9 +1109,9 @@
       "hash": "41fcec64"
     },
     "login.document.title": {
-      "en": "NIM Proxy — Sign in",
+      "en": "Open Proxy — Sign in",
       "desc": "Browser tab title for the sign-in page.",
-      "hash": "991ec816"
+      "hash": "d291536a"
     },
     "login.error.invalid_credentials": {
       "en": "Incorrect username or password.",
@@ -1222,12 +1222,17 @@
       "hash": "5b50e7a6"
     },
     "settings.dialog.delete_user": {
-      "en": "Delete {username}? Their NIM API keys leave the pool and their client API keys are revoked.",
-      "hash": "56bdc932"
+      "en": "Delete {username}? Their API keys leave the pool and their client API keys are revoked.",
+      "hash": "d117529d"
+    },
+    "settings.dialog.remove_group": {
+      "en": "Remove endpoint group {name}? Its keys leave the pool immediately.",
+      "desc": "Confirm removing an endpoint group. {name} is the group name.",
+      "hash": "e218ff4d"
     },
     "settings.dialog.remove_key": {
-      "en": "Remove NIM API key nvapi-••••{last4} from the pool? In-flight requests finish, but its rate-limit window is lost.",
-      "hash": "73435aa0"
+      "en": "Remove API key nvapi-••••{last4} from the pool? In-flight requests finish, but its rate-limit window is lost.",
+      "hash": "32a68047"
     },
     "settings.dialog.reset_password": {
       "en": "New password for {username} (at least 10 characters):",
@@ -1254,20 +1259,25 @@
       "hash": "d0652ad3"
     },
     "settings.key.empty": {
-      "en": "No NIM API keys yet — add one below",
-      "hash": "fa52e200"
+      "en": "No API keys yet — add one below",
+      "hash": "0384d75c"
+    },
+    "settings.key.group": {
+      "en": "Endpoint group",
+      "desc": "Label for the key's endpoint group picker.",
+      "hash": "91494bfd"
     },
     "settings.key.guarded": {
-      "en": "Protected: the superuser must keep at least one enabled NIM API key. Add or enable another before removing this one.",
-      "hash": "8f84df6b"
+      "en": "Protected: the superuser must keep at least one enabled API key. Add or enable another before removing this one.",
+      "hash": "2096ec2a"
     },
     "settings.key.heading.all": {
-      "en": "NIM API keys",
-      "hash": "11fdda21"
+      "en": "API keys",
+      "hash": "98aae897"
     },
     "settings.key.heading.mine": {
-      "en": "My NIM API keys",
-      "hash": "af1c4f87"
+      "en": "My API keys",
+      "hash": "70cf4f91"
     },
     "settings.key.notice.admin": {
       "en": "Keys you add are assigned to your account and join the shared pool. Changes take effect immediately. Disabling a key preserves its rate-limit state.",
@@ -1282,20 +1292,20 @@
       "hash": "75081b59"
     },
     "settings.key.placeholder": {
-      "en": "Paste a new NIM API key (nvapi-…)",
-      "hash": "4c922c00"
+      "en": "Paste a new API key (nvapi-…)",
+      "hash": "c2d363f8"
     },
     "settings.key.pool_note": {
       "en": "Pool: {enabled} enabled · Total: {capacity} rpm",
       "hash": "c2936548"
     },
     "settings.key.remove": {
-      "en": "Remove NIM API key",
-      "hash": "d15bafa9"
+      "en": "Remove API key",
+      "hash": "ccec3fcd"
     },
     "settings.key.rpm": {
       "en": "Requests per minute",
-      "desc": "Accessible name for a NIM API key rate-limit input.",
+      "desc": "Accessible name for an API key rate-limit input.",
       "hash": "aa6d477f"
     },
     "settings.key.slot": {
@@ -1362,6 +1372,36 @@
     "settings.mode.open_note": {
       "en": "Anyone who can reach /v1 can use the pool.",
       "hash": "d9251b4a"
+    },
+    "settings.models.disable": {
+      "en": "Disable",
+      "desc": "Disables the model typed in the field beside it.",
+      "hash": "b7e3e4aa"
+    },
+    "settings.models.empty": {
+      "en": "No disabled models — every catalog model is served.",
+      "desc": "Shown when no model is toggled off.",
+      "hash": "92ce445e"
+    },
+    "settings.models.heading": {
+      "en": "Models",
+      "desc": "Models card title: the global model toggles.",
+      "hash": "d17d2d78"
+    },
+    "settings.models.help": {
+      "en": "Toggle which models this proxy serves. Disabled models are hidden from /v1/models and rejected without spending rate budget.",
+      "desc": "Models card explainer.",
+      "hash": "33790024"
+    },
+    "settings.models.placeholder": {
+      "en": "model id, e.g. org/gpt-4",
+      "desc": "Placeholder for the model disable field.",
+      "hash": "83c198b3"
+    },
+    "settings.models.reenable": {
+      "en": "Re-enable model",
+      "desc": "Title for a disabled model's remove button.",
+      "hash": "8c46a0eb"
     },
     "settings.nav.access": {
       "en": "Access & keys",
@@ -1512,8 +1552,8 @@
       "hash": "43e77160"
     },
     "settings.server.model_limits_help": {
-      "en": "Limits concurrent requests per model when NIM reports worker exhaustion. Limits adjust automatically; add an override only for a known concurrency limit.",
-      "hash": "e091e076"
+      "en": "Limits concurrent requests per model when a provider reports worker exhaustion. Limits adjust automatically; add an override only for a known concurrency limit.",
+      "hash": "6254e27d"
     },
     "settings.server.model_placeholder": {
       "en": "model id, e.g. moonshotai/kimi-k2.5",
@@ -1546,6 +1586,111 @@
     "settings.server.upstream_limits": {
       "en": "Upstream & limits",
       "hash": "e1ebfed2"
+    },
+    "settings.upstream.add": {
+      "en": "Add group",
+      "desc": "Adds the endpoint group from the form below.",
+      "hash": "94901258"
+    },
+    "settings.upstream.any_model": {
+      "en": "any model",
+      "desc": "Shown when a group serves any model (empty allowlist).",
+      "hash": "47d1ba89"
+    },
+    "settings.upstream.base_url": {
+      "en": "Base URL",
+      "desc": "Label for the endpoint group base URL field.",
+      "hash": "70589413"
+    },
+    "settings.upstream.empty": {
+      "en": "No endpoint groups yet.",
+      "desc": "Fallback when no groups are listed; unreachable while the primary group exists.",
+      "hash": "61c27dd8"
+    },
+    "settings.upstream.heading": {
+      "en": "Endpoint groups",
+      "desc": "Providers card title: the endpoint groups below.",
+      "hash": "78a648d8"
+    },
+    "settings.upstream.help": {
+      "en": "Each group is an OpenAI-compatible API with its own keys and rate limits. A group with an empty model list serves any model.",
+      "desc": "Providers card explainer.",
+      "hash": "008cded6"
+    },
+    "settings.upstream.key_count.few": {
+      "en": "{n} API keys",
+      "desc": "CLDR plural category 'few' for the group's key count. {n} is already locale-formatted.",
+      "hash": "2083263c"
+    },
+    "settings.upstream.key_count.many": {
+      "en": "{n} API keys",
+      "desc": "CLDR plural category 'many' for the group's key count. {n} is already locale-formatted.",
+      "hash": "2083263c"
+    },
+    "settings.upstream.key_count.one": {
+      "en": "{n} API key",
+      "desc": "CLDR plural category 'one' for the group's key count. {n} is already locale-formatted.",
+      "hash": "84bd9e68"
+    },
+    "settings.upstream.key_count.other": {
+      "en": "{n} API keys",
+      "desc": "CLDR plural category 'other' for the group's key count. {n} is already locale-formatted.",
+      "hash": "2083263c"
+    },
+    "settings.upstream.key_count.two": {
+      "en": "{n} API keys",
+      "desc": "CLDR plural category 'two' for the group's key count. {n} is already locale-formatted.",
+      "hash": "2083263c"
+    },
+    "settings.upstream.key_count.zero": {
+      "en": "{n} API keys",
+      "desc": "CLDR plural category 'zero' for the group's key count. {n} is already locale-formatted.",
+      "hash": "2083263c"
+    },
+    "settings.upstream.models": {
+      "en": "Models",
+      "desc": "Label for the per-group model allowlist field.",
+      "hash": "d17d2d78"
+    },
+    "settings.upstream.models_placeholder": {
+      "en": "org/gpt-4, org/gpt-5 (empty = any)",
+      "desc": "Placeholder for the per-group model allowlist field.",
+      "hash": "cda474d8"
+    },
+    "settings.upstream.name": {
+      "en": "Group name",
+      "desc": "Label for the endpoint group name field.",
+      "hash": "762ebb70"
+    },
+    "settings.upstream.name_placeholder": {
+      "en": "e.g. openai",
+      "desc": "Placeholder for the endpoint group name field.",
+      "hash": "e3ce2f3c"
+    },
+    "settings.upstream.note": {
+      "en": "Requests route by model name",
+      "desc": "Providers card note.",
+      "hash": "f9a1691b"
+    },
+    "settings.upstream.remove": {
+      "en": "Remove endpoint group",
+      "desc": "Title for the group remove button.",
+      "hash": "29b8323f"
+    },
+    "settings.upstream.toggle.disable": {
+      "en": "Disable group. Its keys stop serving but keep rate-limit state.",
+      "desc": "Title for an enabled group's disable toggle.",
+      "hash": "9f2c12ab"
+    },
+    "settings.upstream.toggle.enable": {
+      "en": "Enable group. Rate-limit state is preserved.",
+      "desc": "Title for a disabled group's enable toggle.",
+      "hash": "a40b6cb8"
+    },
+    "settings.upstream.url_placeholder": {
+      "en": "https://api.example.com/v1",
+      "desc": "Placeholder for the endpoint group base URL field.",
+      "hash": "53aee2ca"
     },
     "settings.users.add": {
       "en": "Add user",
@@ -1590,38 +1735,38 @@
       "hash": "6b0cc904"
     },
     "settings.users.nim_key_count.few": {
-      "en": "{n} NIM API keys",
-      "desc": "CLDR plural category 'few' for the user's NIM API key count. {n} is already locale-formatted; English repeats the other form.",
-      "hash": "e964131c"
+      "en": "{n} API keys",
+      "desc": "CLDR plural category 'few' for the user's API key count. {n} is already locale-formatted; English repeats the other form.",
+      "hash": "2083263c"
     },
     "settings.users.nim_key_count.many": {
-      "en": "{n} NIM API keys",
-      "desc": "CLDR plural category 'many' for the user's NIM API key count. {n} is already locale-formatted; English repeats the other form.",
-      "hash": "e964131c"
+      "en": "{n} API keys",
+      "desc": "CLDR plural category 'many' for the user's API key count. {n} is already locale-formatted; English repeats the other form.",
+      "hash": "2083263c"
     },
     "settings.users.nim_key_count.one": {
-      "en": "{n} NIM API key",
-      "desc": "CLDR plural category 'one' for the user's NIM API key count. {n} is already locale-formatted.",
-      "hash": "edbe8c52"
+      "en": "{n} API key",
+      "desc": "CLDR plural category 'one' for the user's API key count. {n} is already locale-formatted.",
+      "hash": "84bd9e68"
     },
     "settings.users.nim_key_count.other": {
-      "en": "{n} NIM API keys",
-      "desc": "CLDR plural category 'other' for the user's NIM API key count. {n} is already locale-formatted.",
-      "hash": "e964131c"
+      "en": "{n} API keys",
+      "desc": "CLDR plural category 'other' for the user's API key count. {n} is already locale-formatted.",
+      "hash": "2083263c"
     },
     "settings.users.nim_key_count.two": {
-      "en": "{n} NIM API keys",
-      "desc": "CLDR plural category 'two' for the user's NIM API key count. {n} is already locale-formatted; English repeats the other form.",
-      "hash": "e964131c"
+      "en": "{n} API keys",
+      "desc": "CLDR plural category 'two' for the user's API key count. {n} is already locale-formatted; English repeats the other form.",
+      "hash": "2083263c"
     },
     "settings.users.nim_key_count.zero": {
-      "en": "{n} NIM API keys",
-      "desc": "CLDR plural category 'zero' for the user's NIM API key count. {n} is already locale-formatted; English repeats the other form.",
-      "hash": "e964131c"
+      "en": "{n} API keys",
+      "desc": "CLDR plural category 'zero' for the user's API key count. {n} is already locale-formatted; English repeats the other form.",
+      "hash": "2083263c"
     },
     "settings.users.note": {
-      "en": "Deleting a user removes their NIM API keys from the pool and revokes their client API keys.",
-      "hash": "10877a46"
+      "en": "Deleting a user removes their API keys from the pool and revokes their client API keys.",
+      "hash": "37568031"
     },
     "settings.users.password_placeholder": {
       "en": "initial password (10+ characters)",
@@ -1671,43 +1816,48 @@
       "en": "Every limit needs a whole number ≥ 0.",
       "hash": "bd14b8f3"
     },
+    "settings.validation.model_required": {
+      "en": "Type a model id first.",
+      "desc": "The model disable field is required.",
+      "hash": "56e38171"
+    },
     "settings.validation.models_added.few": {
-      "en": "✓ {n} models found. Adding NIM API key…",
-      "desc": "CLDR plural category 'few' for successful NIM API key validation. {n} is the number of returned models and is already locale-formatted; English repeats the other form.",
-      "hash": "8325eafc"
+      "en": "✓ {n} models found. Adding API key…",
+      "desc": "CLDR plural category 'few' for successful API key validation. {n} is the number of returned models and is already locale-formatted; English repeats the other form.",
+      "hash": "d3a75e25"
     },
     "settings.validation.models_added.many": {
-      "en": "✓ {n} models found. Adding NIM API key…",
-      "desc": "CLDR plural category 'many' for successful NIM API key validation. {n} is the number of returned models and is already locale-formatted; English repeats the other form.",
-      "hash": "8325eafc"
+      "en": "✓ {n} models found. Adding API key…",
+      "desc": "CLDR plural category 'many' for successful API key validation. {n} is the number of returned models and is already locale-formatted; English repeats the other form.",
+      "hash": "d3a75e25"
     },
     "settings.validation.models_added.one": {
-      "en": "✓ {n} model found. Adding NIM API key…",
-      "desc": "CLDR plural category 'one' for successful NIM API key validation. {n} is the number of returned models and is already locale-formatted.",
-      "hash": "c1e489e4"
+      "en": "✓ {n} model found. Adding API key…",
+      "desc": "CLDR plural category 'one' for successful API key validation. {n} is the number of returned models and is already locale-formatted.",
+      "hash": "c2df09e5"
     },
     "settings.validation.models_added.other": {
-      "en": "✓ {n} models found. Adding NIM API key…",
-      "desc": "CLDR plural category 'other' for successful NIM API key validation. {n} is the number of returned models and is already locale-formatted.",
-      "hash": "8325eafc"
+      "en": "✓ {n} models found. Adding API key…",
+      "desc": "CLDR plural category 'other' for successful API key validation. {n} is the number of returned models and is already locale-formatted.",
+      "hash": "d3a75e25"
     },
     "settings.validation.models_added.two": {
-      "en": "✓ {n} models found. Adding NIM API key…",
-      "desc": "CLDR plural category 'two' for successful NIM API key validation. {n} is the number of returned models and is already locale-formatted; English repeats the other form.",
-      "hash": "8325eafc"
+      "en": "✓ {n} models found. Adding API key…",
+      "desc": "CLDR plural category 'two' for successful API key validation. {n} is the number of returned models and is already locale-formatted; English repeats the other form.",
+      "hash": "d3a75e25"
     },
     "settings.validation.models_added.zero": {
-      "en": "✓ {n} models found. Adding NIM API key…",
-      "desc": "CLDR plural category 'zero' for successful NIM API key validation. {n} is the number of returned models and is already locale-formatted; English repeats the other form.",
-      "hash": "8325eafc"
+      "en": "✓ {n} models found. Adding API key…",
+      "desc": "CLDR plural category 'zero' for successful API key validation. {n} is the number of returned models and is already locale-formatted; English repeats the other form.",
+      "hash": "d3a75e25"
     },
     "settings.validation.new_password": {
       "en": "New password must be at least 10 characters.",
       "hash": "cbe2939e"
     },
     "settings.validation.nim_key_required": {
-      "en": "Paste a NIM API key first.",
-      "hash": "45e7e8a4"
+      "en": "Paste an API key first.",
+      "hash": "448710dc"
     },
     "settings.validation.password": {
       "en": "Password must be at least 10 characters.",
@@ -1733,22 +1883,27 @@
       "en": "SLO target must be greater than 0 and at most 100.",
       "hash": "90bf3754"
     },
+    "settings.validation.upstream_required": {
+      "en": "Name the group and paste its base URL first.",
+      "desc": "Both group fields are required.",
+      "hash": "80fd3798"
+    },
     "settings.validation.username": {
       "en": "Choose a username.",
       "hash": "b9305ea3"
     },
     "setup.document.title": {
-      "en": "NIM Proxy — First-time setup",
-      "desc": "Browser tab title. 'NIM Proxy' is the product name and stays.",
-      "hash": "a59b017c"
+      "en": "Open Proxy — First-time setup",
+      "desc": "Browser tab title. 'Open Proxy' is the product name and stays.",
+      "hash": "7e45edd1"
     },
     "setup.header.subtitle": {
-      "en": "Complete setup: create the superuser account and add at least one NIM API key.",
-      "hash": "e713a395"
+      "en": "Complete setup: create the superuser account and add at least one API key.",
+      "hash": "d7405b15"
     },
     "setup.header.title": {
       "en": "— First-time setup",
-      "desc": "Follows the untranslated NIM PROXY wordmark.",
+      "desc": "Follows the untranslated OPEN PROXY wordmark.",
       "hash": "f1de6d69"
     },
     "setup.step1.confirm": {
@@ -1802,13 +1957,13 @@
     },
     "setup.step2.error.key_duplicate": {
       "en": "That key is already added.",
-      "desc": "Validation error: the same NIM key is already in the list.",
+      "desc": "Validation error: the same key is already in the list.",
       "hash": "984cdd49"
     },
     "setup.step2.error.key_required": {
-      "en": "Paste a NIM API key first.",
-      "desc": "Validation error: the key field is empty. 'NIM' is the vendor product name and stays.",
-      "hash": "45e7e8a4"
+      "en": "Paste an API key first.",
+      "desc": "Validation error: the key field is empty.",
+      "hash": "448710dc"
     },
     "setup.step2.error.validation_failed": {
       "en": "Key validation failed: {error}",
@@ -1821,14 +1976,14 @@
       "hash": "9e7beddf"
     },
     "setup.step2.hint": {
-      "en": "NIM API keys are shared across clients. The default rate limit is 40 requests/min per key.",
+      "en": "API keys are shared across clients. The default rate limit is 40 requests/min per key.",
       "desc": "Explains pool sharing and the default per-key rate limit.",
-      "hash": "de52a624"
+      "hash": "897d7ac3"
     },
     "setup.step2.key_label": {
-      "en": "NIM API key",
-      "desc": "Accessible name for the setup NIM API key input.",
-      "hash": "48470460"
+      "en": "API key",
+      "desc": "Accessible name for the setup API key input.",
+      "hash": "16f0ee47"
     },
     "setup.step2.key_meta": {
       "en": "{models} models · {rpm} rpm",
@@ -1837,13 +1992,38 @@
     },
     "setup.step2.rpm_label": {
       "en": "Requests per minute",
-      "desc": "Accessible name for the setup NIM API key rate-limit input.",
+      "desc": "Accessible name for the setup API key rate-limit input.",
       "hash": "aa6d477f"
     },
     "setup.step2.validating": {
       "en": "Validating…",
       "desc": "Button label while a key is probed upstream.",
       "hash": "cd51f8c8"
+    },
+    "setup.step2.add_group": {
+      "en": "Add another provider",
+      "desc": "Button label to add a new provider group in the setup wizard.",
+      "hash": "a1b2c3d4"
+    },
+    "setup.step2.group_base_url": {
+      "en": "Upstream base URL",
+      "desc": "Label for the per-group upstream base URL input.",
+      "hash": "b2c3d4e5"
+    },
+    "setup.step2.group_hint": {
+      "en": "For multiple providers, enable JavaScript.",
+      "desc": "Noscript-only hint below the setup wizard step 2.",
+      "hash": "c3d4e5f6"
+    },
+    "setup.step3.review.group": {
+      "en": "{name}",
+      "desc": "Review-panel row label for a provider group. {name} is the group name.",
+      "hash": "d4e5f6a7"
+    },
+    "setup.step3.review.groups_summary": {
+      "en": "{count} providers · {keys} keys total",
+      "desc": "Review-panel summary row showing total groups and keys. Keep the middle dot.",
+      "hash": "e5f6a7b8"
     },
     "setup.step3.api_access_keyed": {
       "en": "API key required · first client key \"default\"",
@@ -1885,13 +2065,13 @@
       "hash": "923fd434"
     },
     "setup.step3.review.keys": {
-      "en": "NIM keys",
-      "desc": "Review-panel row label: the upstream NIM API keys added in step 2. 'NIM' is the vendor product name and stays.",
-      "hash": "504945ef"
+      "en": "API keys",
+      "desc": "Review-panel row label: the upstream API keys added in step 2.",
+      "hash": "98aae897"
     },
     "setup.step3.review.keys_value": {
       "en": "{count} validated · Total {rpm} rpm",
-      "desc": "Review-panel value for the NIM keys row: how many keys validated, then the pool's combined per-minute limit. 'rpm' is a unit and must survive verbatim.",
+      "desc": "Review-panel value for the API keys row: how many keys validated, then the pool's combined per-minute limit. 'rpm' is a unit and must survive verbatim.",
       "hash": "1497318d"
     },
     "setup.step3.review.superuser": {
@@ -1942,8 +2122,8 @@
       "hash": "798ca2ce"
     },
     "setup.stepper.step2": {
-      "en": "Add NIM API keys",
-      "hash": "77cd4a4d"
+      "en": "Add API keys",
+      "hash": "40014102"
     },
     "setup.stepper.step3": {
       "en": "Review & finish",

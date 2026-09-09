@@ -15,8 +15,8 @@ use utoipa::ToSchema;
 
 use crate::api::{
     ApiError, ApiJson, ClientKeyRow, ClientsResponse, ConfigResponse, HistorySettings,
-    MintedClientKey, NimKeyRow, OkResponse, PoolSummary, ServerSettings, SetupResponse, UserRow,
-    ValidateKeyResponse,
+    MintedClientKey, NimKeyRow, OkResponse, PoolSummary, ServerSettings, SetupResponse,
+    UpstreamRow, UserRow, ValidateKeyResponse,
 };
 use crate::config::{self, NimKey, Role, StoredConfig, User};
 use crate::{auth, AppState};
@@ -88,10 +88,24 @@ pub struct SetupReq {
     base_url: Option<String>,
     #[serde(default)]
     nim_keys: Vec<SetupKey>,
+    /// Multi-provider groups. When non-empty, each group becomes an
+    /// `UpstreamEndpoint` (the primary `upstream` gets the first group's
+    /// keys; remaining groups go into `upstreams`). Legacy single-group
+    /// payloads leave this empty.
+    #[serde(default)]
+    groups: Vec<SetupGroup>,
     /// Mint a first client key with the claim (the wizard sends this by
     /// default) so a fresh keyed-mode proxy can serve /v1 immediately.
     #[serde(default)]
     create_client_key: Option<CreateClientKey>,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct SetupGroup {
+    name: String,
+    base_url: String,
+    #[serde(default)]
+    keys: Vec<SetupKey>,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -136,6 +150,7 @@ impl From<NoScriptSetupForm> for SetupReq {
             password: form.password,
             base_url: form.base_url,
             nim_keys,
+            groups: Vec::new(),
             // A client secret is shown exactly once. The native form redirects,
             // so it must not mint a secret it has no safe response body to show.
             create_client_key: None,
@@ -144,7 +159,7 @@ impl From<NoScriptSetupForm> for SetupReq {
 }
 
 /// `POST /setup` — one atomic claim: create the superuser, record the
-/// initial NIM keys, persist, and mint a session. No half-configured server
+/// initial API keys, persist, and mint a session. No half-configured server
 /// state exists at any point; an abandoned wizard leaves nothing behind.
 #[utoipa::path(
     post,
@@ -234,13 +249,53 @@ pub async fn setup_submit(State(state): State<Arc<AppState>>, req: Request) -> R
         if let Some(b) = &req.base_url {
             cand.upstream.base_url = b.trim().trim_end_matches('/').to_owned();
         }
-        for k in &req.nim_keys {
-            cand.upstream.nim_keys.push(NimKey {
-                key: k.key.trim().to_owned(),
-                owner: req.username.clone(),
-                enabled: true,
-                rpm: k.rpm.unwrap_or(40),
-            });
+        if !req.groups.is_empty() {
+            // Multi-group claim: first group populates the primary upstream;
+            // remaining groups become UpstreamEndpoint entries.
+            let groups = &req.groups;
+            let first = &groups[0];
+            if !first.base_url.is_empty() {
+                cand.upstream.base_url = first.base_url.trim().trim_end_matches('/').to_owned();
+            }
+            for k in &first.keys {
+                cand.upstream.nim_keys.push(NimKey {
+                    key: k.key.trim().to_owned(),
+                    owner: req.username.clone(),
+                    enabled: true,
+                    rpm: k.rpm.unwrap_or(40),
+                });
+            }
+            for group in &groups[1..] {
+                let name = group.name.trim().to_owned();
+                if name == config::PRIMARY_UPSTREAM {
+                    continue;
+                }
+                cand.upstreams.push(config::UpstreamEndpoint {
+                    name,
+                    base_url: group.base_url.trim().trim_end_matches('/').to_owned(),
+                    enabled: true,
+                    keys: group
+                        .keys
+                        .iter()
+                        .map(|k| NimKey {
+                            key: k.key.trim().to_owned(),
+                            owner: req.username.clone(),
+                            enabled: true,
+                            rpm: k.rpm.unwrap_or(40),
+                        })
+                        .collect(),
+                    models: Vec::new(),
+                });
+            }
+        } else {
+            for k in &req.nim_keys {
+                cand.upstream.nim_keys.push(NimKey {
+                    key: k.key.trim().to_owned(),
+                    owner: req.username.clone(),
+                    enabled: true,
+                    rpm: k.rpm.unwrap_or(40),
+                });
+            }
         }
         if let Some(ck) = &req.create_client_key {
             let secret = mint_client_secret();
@@ -288,13 +343,18 @@ pub async fn setup_submit(State(state): State<Arc<AppState>>, req: Request) -> R
 
 #[derive(Deserialize, ToSchema)]
 pub struct ValidateKeyReq {
-    /// The NIM key to probe.
+    /// The API key to probe.
     key: String,
     /// Only honored by `/setup/validate-key` (pre-claim, no upstream is
     /// configured yet). The authenticated twin ignores it — see
     /// [`validate_key`].
     #[serde(default)]
     base_url: Option<String>,
+    /// Authenticated twin only: probe against this endpoint group's
+    /// `base_url` instead of the primary's. Pre-claim there are no groups,
+    /// so `/setup/validate-key` rejects it.
+    #[serde(default)]
+    upstream: Option<String>,
 }
 
 /// `POST /setup/validate-key` — pre-auth key probe for the wizard, bounded
@@ -322,6 +382,13 @@ pub async fn setup_validate_key(State(state): State<Arc<AppState>>, req: Request
         Ok(req) => req,
         Err(response) => return response,
     };
+    if req.upstream.is_some() {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "unknown_upstream",
+            "no endpoint groups exist before setup",
+        );
+    }
     if !state.admin.admit_pre_auth_attempt() {
         return json_error(
             StatusCode::TOO_MANY_REQUESTS,
@@ -455,40 +522,62 @@ pub async fn api_config(
         .map(|(lane, s)| (s.key.clone(), (lane, s.in_window, s.cooldown_ms)))
         .collect();
 
-    // The padlocked key: the superuser's only enabled key (the pool floor).
+    // The padlocked key: the superuser's only enabled key on an enabled
+    // group (the pool floor). Spans every group, not just the primary.
     let su = sc
         .superuser()
         .map(|u| u.username.clone())
         .unwrap_or_default();
-    let su_enabled: Vec<&str> = sc
-        .upstream
-        .nim_keys
-        .iter()
-        .filter(|k| k.enabled && k.owner == su)
-        .map(|k| k.key.as_str())
-        .collect();
-    let guarded_key = (su_enabled.len() == 1).then(|| su_enabled[0].to_owned());
+    let su_enabled: Vec<String> = {
+        let mut v: Vec<String> = sc
+            .upstream
+            .nim_keys
+            .iter()
+            .filter(|k| sc.upstream.enabled && k.enabled && k.owner == su)
+            .map(|k| k.key.clone())
+            .collect();
+        for ep in &sc.upstreams {
+            v.extend(
+                ep.keys
+                    .iter()
+                    .filter(|k| ep.enabled && k.enabled && k.owner == su)
+                    .map(|k| k.key.clone()),
+            );
+        }
+        v
+    };
+    let guarded_key = (su_enabled.len() == 1).then(|| su_enabled[0].clone());
 
-    let nim_keys: Vec<NimKeyRow> = sc
-        .upstream
-        .nim_keys
-        .iter()
-        .filter(|k| admin_view || k.owner == username)
-        .map(|k| {
-            let lane = stats.get(&k.key);
-            NimKeyRow {
-                cooldown_ms: lane.map(|(_, _, c)| *c),
-                enabled: k.enabled,
-                fingerprint: fingerprint(&k.key),
-                guarded: guarded_key.as_deref() == Some(k.key.as_str()),
-                in_window: lane.map(|(_, w, _)| *w),
-                lane: lane.map(|(i, _, _)| *i),
-                last4: last4(&k.key),
-                owner: k.owner.clone(),
-                rpm: k.rpm,
-            }
-        })
-        .collect();
+    let mut nim_keys: Vec<NimKeyRow> = Vec::new();
+    let push_keys = |group: &str, keys: &[NimKey], nim_keys: &mut Vec<NimKeyRow>| {
+        nim_keys.extend(
+            keys.iter()
+                .filter(|k| admin_view || k.owner == username)
+                .map(|k| {
+                    let lane = stats.get(&k.key);
+                    NimKeyRow {
+                        cooldown_ms: lane.map(|(_, _, c)| *c),
+                        enabled: k.enabled,
+                        fingerprint: fingerprint(&k.key),
+                        guarded: guarded_key.as_deref() == Some(k.key.as_str()),
+                        in_window: lane.map(|(_, w, _)| *w),
+                        lane: lane.map(|(i, _, _)| *i),
+                        last4: last4(&k.key),
+                        owner: k.owner.clone(),
+                        rpm: k.rpm,
+                        upstream: group.to_owned(),
+                    }
+                }),
+        );
+    };
+    push_keys(
+        config::PRIMARY_UPSTREAM,
+        &sc.upstream.nim_keys,
+        &mut nim_keys,
+    );
+    for ep in &sc.upstreams {
+        push_keys(&ep.name, &ep.keys, &mut nim_keys);
+    }
 
     let client_keys: Vec<ClientKeyRow> = sc
         .client_auth
@@ -535,7 +624,12 @@ pub async fn api_config(
                     .nim_keys
                     .iter()
                     .filter(|k| k.owner == u.username)
-                    .count(),
+                    .count()
+                    + sc.upstreams
+                        .iter()
+                        .flat_map(|ep| ep.keys.iter())
+                        .filter(|k| k.owner == u.username)
+                        .count(),
                 role: u.role,
                 username: u.username.clone(),
             })
@@ -547,6 +641,7 @@ pub async fn api_config(
 
     axum::Json(ConfigResponse {
         client_keys,
+        disabled_models: sc.disabled_models.clone(),
         locale: sc.user(&username).and_then(|user| user.locale.clone()),
         mode: sc.client_auth.mode,
         nim_keys,
@@ -556,10 +651,54 @@ pub async fn api_config(
         },
         role,
         server,
+        upstreams: upstream_rows(&sc, &username, admin_view),
         username,
         users,
     })
     .into_response()
+}
+
+/// Endpoint-group rows. Admins see every group; non-admins see the groups
+/// holding their own keys (with their own key count), so internal URLs of
+/// other teams' groups don't leak through a filtered view.
+fn upstream_rows(sc: &StoredConfig, username: &str, admin_view: bool) -> Vec<UpstreamRow> {
+    let mut rows = Vec::with_capacity(1 + sc.upstreams.len());
+    let push = |name: &str,
+                base_url: &str,
+                enabled: bool,
+                models: &[String],
+                keys: &[NimKey],
+                rows: &mut Vec<UpstreamRow>| {
+        let mine = keys.iter().filter(|k| k.owner == username).count();
+        if admin_view || mine > 0 {
+            rows.push(UpstreamRow {
+                base_url: base_url.to_owned(),
+                enabled,
+                keys: if admin_view { keys.len() } else { mine },
+                models: models.to_owned(),
+                name: name.to_owned(),
+            });
+        }
+    };
+    push(
+        config::PRIMARY_UPSTREAM,
+        &sc.upstream.base_url,
+        sc.upstream.enabled,
+        &sc.upstream.models,
+        &sc.upstream.nim_keys,
+        &mut rows,
+    );
+    for ep in &sc.upstreams {
+        push(
+            &ep.name,
+            &ep.base_url,
+            ep.enabled,
+            &ep.models,
+            &ep.keys,
+            &mut rows,
+        );
+    }
+    rows
 }
 
 /// Exactly one of `add` / `remove` / `set` per request.
@@ -574,9 +713,13 @@ pub struct NimKeysReq {
 #[derive(Deserialize, ToSchema)]
 pub struct AddNimKey {
     key: String,
-    /// Requests per minute for this key's lane; defaults to 40 (NIM's free
-    /// tier).
+    /// Requests per minute for this key's lane; defaults to 40 (the
+    /// upstream's free-tier default).
     rpm: Option<usize>,
+    /// Endpoint group to add the key to; defaults to the primary group.
+    /// Any OpenAI-compatible group name works — the key is just a bearer
+    /// lane against that group's `base_url`.
+    upstream: Option<String>,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -587,8 +730,11 @@ pub struct SetNimKey {
 }
 
 /// `POST /api/settings/nim-keys` — any role may add keys (owner = caller)
-/// and manage their OWN keys; admins manage any key. The superuser's last
-/// enabled key is protected by `validate` (the pool-floor invariant).
+/// and manage their OWN keys; admins manage any key. Keys are scoped to an
+/// endpoint group (`upstream`, default `nvidia`); fingerprints are globally
+/// unique so remove/set need no group. The pool floor spans groups: the
+/// validator refuses to strand the superuser without an enabled key on an
+/// enabled group.
 #[utoipa::path(
     post,
     path = "/api/settings/nim-keys",
@@ -597,7 +743,7 @@ pub struct SetNimKey {
     responses(
         (status = 200, description = "Applied; the pool was rebuilt with rate-state carryover",
             body = OkResponse),
-        (status = 400, description = "No such key, more than one action, or a store the \
+        (status = 400, description = "No such key, unknown group, more than one action, or a store the \
             validator rejects (e.g. removing the pool floor)", body = ApiError),
         (status = 401, description = "No session, or the caller's user was deleted", body = ApiError),
         (status = 403, description = "Not the key's owner and not an admin", body = ApiError),
@@ -615,7 +761,11 @@ pub async fn nim_keys(
     let mut cand = guard.clone();
     match (req.add, req.remove, req.set) {
         (Some(add), None, None) => {
-            cand.upstream.nim_keys.push(NimKey {
+            let group = add.upstream.as_deref().unwrap_or(config::PRIMARY_UPSTREAM);
+            let Some(list) = cand.group_keys_mut(group) else {
+                return bad_request(format!("no such upstream {group:?}"));
+            };
+            list.push(NimKey {
                 key: add.key.trim().to_owned(),
                 owner: username,
                 enabled: true,
@@ -623,26 +773,16 @@ pub async fn nim_keys(
             });
         }
         (None, Some(fp), None) => {
-            let Some(pos) = cand
-                .upstream
-                .nim_keys
-                .iter()
-                .position(|k| fingerprint(&k.key) == fp)
-            else {
+            let Some((owner, _group)) = remove_key(&mut cand, &fp) else {
                 return bad_request("no such key");
             };
-            if !role.is_admin() && cand.upstream.nim_keys[pos].owner != username {
+            if !role.is_admin() && owner != username {
+                // `cand` is a private clone: returning here commits nothing.
                 return forbidden("you can only remove your own keys");
             }
-            cand.upstream.nim_keys.remove(pos);
         }
         (None, None, Some(set)) => {
-            let Some(k) = cand
-                .upstream
-                .nim_keys
-                .iter_mut()
-                .find(|k| fingerprint(&k.key) == set.fingerprint)
-            else {
+            let Some(k) = find_key_mut(&mut cand, &set.fingerprint) else {
                 return bad_request("no such key");
             };
             if !role.is_admin() && k.owner != username {
@@ -661,6 +801,29 @@ pub async fn nim_keys(
         Ok(()) => ok_json(),
         Err(e) => bad_request(e),
     }
+}
+
+/// Find a stored key by fingerprint across every group.
+fn find_key_mut<'a>(cand: &'a mut StoredConfig, fp: &str) -> Option<&'a mut NimKey> {
+    for (_, list) in cand.key_groups_mut() {
+        if let Some(k) = list.iter_mut().find(|k| fingerprint(&k.key) == fp) {
+            return Some(k);
+        }
+    }
+    None
+}
+
+/// Remove a stored key by fingerprint across every group, returning its
+/// owner and group. The removal applies to the candidate immediately; the
+/// caller must not commit when authorization fails.
+fn remove_key(cand: &mut StoredConfig, fp: &str) -> Option<(String, String)> {
+    for (group, list) in cand.key_groups_mut() {
+        if let Some(pos) = list.iter().position(|k| fingerprint(&k.key) == fp) {
+            let k = list.remove(pos);
+            return Some((k.owner, group));
+        }
+    }
+    None
 }
 
 /// Exactly one of `add` / `remove` / `mode` per request.
@@ -797,7 +960,7 @@ macro_rules! admin_section {
 #[derive(Deserialize, ToSchema)]
 pub struct UpstreamReq {
     /// `http(s)://host[:port]`; link-local addresses are refused (cloud
-    /// metadata endpoints have no legitimate NIM use).
+    /// metadata endpoints have no legitimate upstream use).
     base_url: String,
 }
 
@@ -842,6 +1005,174 @@ pub async fn upstream(
     }
 }
 
+/// Exactly one of `add` / `remove` / `set` per request.
+#[derive(Deserialize, ToSchema)]
+pub struct UpstreamsReq {
+    add: Option<AddUpstream>,
+    /// Name of the endpoint group to remove (its keys leave the pool).
+    remove: Option<String>,
+    set: Option<SetUpstream>,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct AddUpstream {
+    /// Group id (`nvidia` is reserved for the primary group).
+    name: String,
+    /// `http(s)://host[:port]`; link-local addresses are refused.
+    base_url: String,
+    /// Model allowlist; omitted or empty serves any model.
+    models: Option<Vec<String>>,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct SetUpstream {
+    name: String,
+    enabled: Option<bool>,
+    base_url: Option<String>,
+    /// Full replacement of the group's model allowlist (empty = any model).
+    models: Option<Vec<String>>,
+}
+
+/// `POST /api/settings/upstreams` (admin) — manage the extra
+/// OpenAI-compatible endpoint groups: add a custom API, remove one (its keys
+/// leave the pool), or toggle it / retarget it / repin its models. The
+/// primary `nvidia` group can be toggled and repinned here but never removed
+/// (disable it instead). Commits flush the model-catalog cache and the
+/// per-model no-inject memory, which are upstream-specific.
+#[utoipa::path(
+    post,
+    path = "/api/settings/upstreams",
+    tag = "settings",
+    request_body = UpstreamsReq,
+    responses(
+        (status = 200, description = "Applied; the pool was rebuilt and upstream caches were flushed",
+            body = OkResponse),
+        (status = 400, description = "Unknown group, more than one action, or a store the \
+            validator rejects", body = ApiError),
+        (status = 401, description = "No session, or the caller's user was deleted", body = ApiError),
+        (status = 403, description = "Server settings require an admin", body = ApiError),
+    ),
+)]
+pub async fn upstreams(
+    State(state): State<Arc<AppState>>,
+    Extension(Identity(username)): Extension<Identity>,
+    ApiJson(req): ApiJson<UpstreamsReq>,
+) -> Response {
+    let result = {
+        let mut guard = state.store.lock().unwrap();
+        match role_of(&guard, &username) {
+            Some(r) if r.is_admin() => {}
+            Some(_) => return forbidden("server settings require an admin"),
+            None => return stale_session(),
+        }
+        let mut cand = guard.clone();
+        match (req.add, req.remove, req.set) {
+            (Some(add), None, None) => {
+                cand.upstreams.push(config::UpstreamEndpoint {
+                    name: add.name.trim().to_owned(),
+                    base_url: add.base_url.trim().trim_end_matches('/').to_owned(),
+                    enabled: true,
+                    keys: Vec::new(),
+                    models: add.models.unwrap_or_default(),
+                });
+            }
+            (None, Some(name), None) => {
+                if name == config::PRIMARY_UPSTREAM {
+                    return bad_request("the primary group cannot be removed; disable it instead");
+                }
+                let Some(pos) = cand.upstreams.iter().position(|ep| ep.name == name) else {
+                    return bad_request(format!("no such upstream {name:?}"));
+                };
+                cand.upstreams.remove(pos);
+            }
+            (None, None, Some(set)) => {
+                if set.name == config::PRIMARY_UPSTREAM {
+                    if let Some(e) = set.enabled {
+                        cand.upstream.enabled = e;
+                    }
+                    if let Some(b) = set.base_url {
+                        cand.upstream.base_url = b.trim().trim_end_matches('/').to_owned();
+                    }
+                    if let Some(m) = set.models {
+                        cand.upstream.models = m;
+                    }
+                } else {
+                    let Some(ep) = cand.upstreams.iter_mut().find(|ep| ep.name == set.name) else {
+                        return bad_request(format!("no such upstream {:?}", set.name));
+                    };
+                    if let Some(e) = set.enabled {
+                        ep.enabled = e;
+                    }
+                    if let Some(b) = set.base_url {
+                        ep.base_url = b.trim().trim_end_matches('/').to_owned();
+                    }
+                    if let Some(m) = set.models {
+                        ep.models = m;
+                    }
+                }
+            }
+            _ => return bad_request("send exactly one of add / remove / set"),
+        }
+        commit(&state, &mut guard, cand)
+    };
+    match result {
+        Ok(()) => {
+            *state.models_cache.lock().await = None;
+            state.no_inject.lock().unwrap().clear();
+            ok_json()
+        }
+        Err(e) => bad_request(e),
+    }
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct ModelsReq {
+    /// Full replacement of the globally toggled-off model list. Disabled
+    /// models vanish from the merged `/v1/models` catalog and are rejected
+    /// with `model_disabled` before queueing.
+    disabled: Vec<String>,
+}
+
+/// `POST /api/settings/models` (admin) — toggle which models the proxy
+/// serves. The list is a full replacement so a dashboard checkbox syncs with
+/// one request; entries use the model-id charset and are capped at 256.
+#[utoipa::path(
+    post,
+    path = "/api/settings/models",
+    tag = "settings",
+    request_body = ModelsReq,
+    responses(
+        (status = 200, description = "Applied; the model catalog cache was flushed", body = OkResponse),
+        (status = 400, description = "The store validator rejected the list", body = ApiError),
+        (status = 401, description = "No session, or the caller's user was deleted", body = ApiError),
+        (status = 403, description = "Server settings require an admin", body = ApiError),
+    ),
+)]
+pub async fn models_cfg(
+    State(state): State<Arc<AppState>>,
+    Extension(Identity(username)): Extension<Identity>,
+    ApiJson(req): ApiJson<ModelsReq>,
+) -> Response {
+    let result = {
+        let mut guard = state.store.lock().unwrap();
+        match role_of(&guard, &username) {
+            Some(r) if r.is_admin() => {}
+            Some(_) => return forbidden("server settings require an admin"),
+            None => return stale_session(),
+        }
+        let mut cand = guard.clone();
+        cand.disabled_models = req.disabled;
+        commit(&state, &mut guard, cand)
+    };
+    match result {
+        Ok(()) => {
+            *state.models_cache.lock().await = None;
+            ok_json()
+        }
+        Err(e) => bad_request(e),
+    }
+}
+
 /// Mirror of `config::Limits` WITHOUT serde defaults: a partial body is a
 /// 422, never a silent reset of the omitted fields.
 #[derive(Deserialize, ToSchema)]
@@ -873,7 +1204,7 @@ fn replace_limits(cand: &mut StoredConfig, req: LimitsReq) {
 #[derive(Deserialize, ToSchema)]
 pub struct ServerReq {
     /// `http(s)://host[:port]`; link-local addresses are refused (cloud
-    /// metadata endpoints have no legitimate NIM use).
+    /// metadata endpoints have no legitimate upstream use).
     base_url: String,
     #[serde(flatten)]
     limits: LimitsReq,
@@ -994,7 +1325,7 @@ admin_section!(
 #[derive(Deserialize, ToSchema)]
 pub struct UsersReq {
     add: Option<AddUser>,
-    /// Username to delete. Their NIM keys leave the pool and their client
+    /// Username to delete. Their API keys leave the pool and their client
     /// keys are revoked.
     remove: Option<String>,
     reset_password: Option<ResetPassword>,
@@ -1032,7 +1363,7 @@ fn parse_role(s: &str) -> Option<Role> {
 }
 
 /// `POST /api/settings/users` (admin) — create/delete users, reset
-/// passwords, change roles. Deleting a user pulls their NIM keys from the
+/// passwords, change roles. Deleting a user pulls their API keys from the
 /// pool and revokes their client keys — their harnesses stop; that's the
 /// point. The superuser can never be deleted or demoted.
 #[utoipa::path(
@@ -1129,6 +1460,9 @@ pub async fn users(
             }
             cand.users.retain(|u| u.username != target);
             cand.upstream.nim_keys.retain(|k| k.owner != target);
+            for ep in &mut cand.upstreams {
+                ep.keys.retain(|k| k.owner != target);
+            }
             cand.client_auth.keys.retain(|c| c.owner != target);
         }
         (None, None, Some(reset), None) => {
@@ -1554,19 +1888,21 @@ pub async fn locale(
 }
 
 /// `POST /api/settings/validate-key` — authenticated twin of the setup
-/// probe. The upstream is ALWAYS the configured `base_url`, never a
-/// caller-supplied one: a request-supplied target would let any logged-in
-/// user turn the proxy into an SSRF probe of internal hosts (the response
-/// distinguishes reachable/rejected/unreachable). An admin testing a new
-/// upstream saves it first, then validates. `req.base_url` is ignored.
+/// probe. The upstream is ALWAYS a configured group (`upstream`, default the
+/// primary `nvidia`), never a caller-supplied URL: a request-supplied target
+/// would let any logged-in user turn the proxy into an SSRF probe of
+/// internal hosts (the response distinguishes reachable/rejected/
+/// unreachable). An admin testing a brand-new API saves the group first,
+/// then validates. `req.base_url` is ignored.
 #[utoipa::path(
     post,
     path = "/api/settings/validate-key",
     tag = "settings",
     request_body = ValidateKeyReq,
     responses(
-        (status = 200, description = "Probe finished against the CONFIGURED upstream; any \
+        (status = 200, description = "Probe finished against the CONFIGURED group; any \
             `base_url` in the body is ignored (SSRF guard)", body = ValidateKeyResponse),
+        (status = 400, description = "Unknown endpoint group", body = ApiError),
         (status = 401, description = "No session", body = ApiError),
     ),
 )]
@@ -1574,7 +1910,18 @@ pub async fn validate_key(
     State(state): State<Arc<AppState>>,
     ApiJson(req): ApiJson<ValidateKeyReq>,
 ) -> Response {
-    let base = state.store.lock().unwrap().upstream.base_url.clone();
+    let group = req.upstream.as_deref().unwrap_or(config::PRIMARY_UPSTREAM);
+    let base = {
+        let sc = state.store.lock().unwrap();
+        if group == config::PRIMARY_UPSTREAM {
+            sc.upstream.base_url.clone()
+        } else {
+            let Some(ep) = sc.upstreams.iter().find(|ep| ep.name == group) else {
+                return bad_request(format!("no such upstream {group:?}"));
+            };
+            ep.base_url.clone()
+        }
+    };
     let base = base.trim().trim_end_matches('/').to_owned();
     axum::Json(ValidateKeyResponse::probed(
         probe_key(&state.http, &base, req.key.trim()).await,

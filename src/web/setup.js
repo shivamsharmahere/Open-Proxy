@@ -1,7 +1,7 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 const setErrorText = (text) => { $("err").textContent = text || ""; };
-const EMERGENCY_MESSAGE = "NIM Proxy interface failed to load.";
+const EMERGENCY_MESSAGE = "Open Proxy interface failed to load.";
 let MSG;
 function failInterface() {
   document.body.replaceChildren(document.createTextNode(EMERGENCY_MESSAGE));
@@ -162,123 +162,218 @@ function initializeSetup() {
   );
   document.body.hidden = false;
 }
-let keys = []; // {key, rpm, models}
+
+/* ========== Multi-provider groups ========== */
+
+let groups = []; // [{name, base_url, keys: [{key, rpm, models}]}]
+
+function createDefaultGroup() {
+  return { name: "", base_url: "", keys: [] };
+}
+
+// Ensure at least one group exists.
+if (groups.length === 0) groups.push(createDefaultGroup());
 
 function show(n) {
   [1,2,3].forEach(i => { $("step"+i).hidden = i !== n; $("s"+i).classList.toggle("on", i <= n); });
   setErrorText("");
 }
-function mask(k) { return k.length > 8 ? k.slice(0,6) + "••••" + k.slice(-4) : "••••"; }
-function renderKeys() {
-  const rows = keys.map((key, index) => {
-    const row = document.createElement("li");
-    const ok = document.createElement("span");
-    ok.className = "ok";
-    ok.textContent = "✓";
-    const masked = document.createElement("code");
-    masked.textContent = mask(key.key);
-    const meta = document.createElement("span");
-    meta.className = "meta";
-    setMessageText(meta, "setup.step2.key_meta", {
-      models: key.models,
-      rpm: key.rpm,
+function mask(k) { return k.length > 8 ? k.slice(0,6) + "\u2022\u2022\u2022\u2022" + k.slice(-4) : "\u2022\u2022\u2022\u2022"; }
+
+/* --- Render group cards --- */
+function renderGroups() {
+  const container = $("groups");
+  container.innerHTML = "";
+  groups.forEach((group, gi) => {
+    const card = document.createElement("div");
+    card.className = "group-card";
+    card.dataset.gi = gi;
+
+    // Group header: name input + remove button
+    const header = document.createElement("div");
+    header.className = "group-header";
+    const nameInput = document.createElement("input");
+    nameInput.className = "group-name";
+    nameInput.type = "text";
+    nameInput.placeholder = "Provider " + (gi + 1);
+    nameInput.value = group.name;
+    nameInput.oninput = () => { groups[gi].name = nameInput.value; };
+    header.appendChild(nameInput);
+    if (groups.length > 1) {
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "ghost";
+      removeBtn.textContent = "\u00d7";
+      removeBtn.onclick = () => { groups.splice(gi, 1); renderGroups(); };
+      header.appendChild(removeBtn);
+    }
+    card.appendChild(header);
+
+    // Base URL
+    const baseRow = document.createElement("div");
+    baseRow.className = "group-base";
+    const baseLabel = document.createElement("label");
+    setMessageText(baseLabel, "setup.step2.group_base_url");
+    const baseInput = document.createElement("input");
+    baseInput.className = "base-url";
+    baseInput.type = "url";
+    baseInput.placeholder = "https://integrate.api.nvidia.com";
+    baseInput.value = group.base_url;
+    baseInput.oninput = () => { groups[gi].base_url = baseInput.value; };
+    baseRow.append(baseLabel, baseInput);
+    card.appendChild(baseRow);
+
+    // Key list
+    const keyList = document.createElement("ul");
+    keyList.className = "keys";
+    group.keys.forEach((keyObj, ki) => {
+      const row = document.createElement("li");
+      const ok = document.createElement("span");
+      ok.className = "ok";
+      ok.textContent = "\u2713";
+      const masked = document.createElement("code");
+      masked.textContent = mask(keyObj.key);
+      const meta = document.createElement("span");
+      meta.className = "meta";
+      setMessageText(meta, "setup.step2.key_meta", { models: keyObj.models, rpm: keyObj.rpm });
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "ghost";
+      remove.textContent = "\u00d7";
+      remove.onclick = () => { groups[gi].keys.splice(ki, 1); renderGroups(); };
+      row.append(ok, " ", masked, meta, remove);
+      keyList.appendChild(row);
     });
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.className = "ghost";
-    remove.textContent = "×";
-    remove.onclick = () => { keys.splice(index, 1); renderKeys(); };
-    row.append(ok, " ", masked, meta, remove);
-    return row;
+    card.appendChild(keyList);
+
+    // Add key row
+    const addRow = document.createElement("div");
+    addRow.className = "addrow";
+    const keyInput = document.createElement("input");
+    keyInput.className = "key";
+    keyInput.type = "password";
+    keyInput.placeholder = "nvapi-\u2026";
+    const rpmInput = document.createElement("input");
+    rpmInput.className = "rpm";
+    rpmInput.type = "number";
+    rpmInput.value = "40";
+    rpmInput.min = "1";
+    rpmInput.max = "10000";
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "ghost";
+    setMessageText(addBtn, "setup.step2.addkey");
+    addBtn.onclick = async () => {
+      const key = keyInput.value.trim(), rpm = Math.max(1, Math.min(10000, +rpmInput.value || 40));
+      if (!key) return setMessageText($("err"), "setup.step2.error.key_required");
+      if (groups[gi].keys.some(k => k.key === key))
+        return setMessageText($("err"), "setup.step2.error.key_duplicate");
+      setErrorText("");
+      addBtn.disabled = true; setMessageText(addBtn, "setup.step2.validating");
+      try {
+        const body = { key };
+        const base = baseInput.value.trim();
+        if (base) body.base_url = base;
+        const r = await fetch("/setup/validate-key", { method: "POST",
+          headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        const v = await r.json();
+        if (v.ok) { groups[gi].keys.push({ key, rpm, models: v.models }); keyInput.value = ""; renderGroups(); }
+        else setMessageText($("err"), "setup.step2.error.validation_failed", { error: v.error || r.status });
+      } catch (e) { setMessageText($("err"), "setup.step2.error.validation_request", { error: e }); }
+      addBtn.disabled = false; setMessageText(addBtn, "setup.step2.addkey");
+    };
+    addRow.append(keyInput, rpmInput, addBtn);
+    card.appendChild(addRow);
+
+    container.appendChild(card);
   });
-  $("keylist").replaceChildren(...rows);
-  $("to3").disabled = keys.length === 0;
+
+  // "Add provider" button visibility
+  $("addgroup").hidden = false;
+  // Continue enabled only when every group has >= 1 key
+  $("to3").disabled = !groups.every(g => g.keys.length > 0);
 }
+
+$("addgroup").onclick = () => { groups.push(createDefaultGroup()); renderGroups(); };
+
+/* --- Step transitions --- */
 
 $("to2").onclick = () => {
   const u = $("username").value.trim(), p = $("password").value;
   if (!/^[A-Za-z0-9._-]{1,32}$/.test(u)) return setMessageText($("err"), "setup.step1.error.username_charset");
   if (p.length < 10) return setMessageText($("err"), "setup.step1.error.password_length");
   if (p !== $("confirm").value) return setMessageText($("err"), "setup.step1.error.password_mismatch");
+  renderGroups();
   show(2);
 };
 $("back1").onclick = () => show(1);
 $("back2").onclick = () => show(2);
 
-$("addkey").onclick = async () => {
-  const key = $("newkey").value.trim(), rpm = Math.max(1, Math.min(10000, +$("newrpm").value || 40));
-  if (!key) return setMessageText($("err"), "setup.step2.error.key_required");
-  if (keys.some(k => k.key === key)) return setMessageText($("err"), "setup.step2.error.key_duplicate");
-  setErrorText("");
-  $("addkey").disabled = true; setMessageText($("addkey"), "setup.step2.validating");
-  try {
-    const body = { key };
-    const base = $("baseurl").value.trim();
-    if (base) body.base_url = base;
-    const r = await fetch("/setup/validate-key", { method: "POST",
-      headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    const v = await r.json();
-    if (v.ok) { keys.push({ key, rpm, models: v.models }); $("newkey").value = ""; renderKeys(); }
-    else setMessageText($("err"), "setup.step2.error.validation_failed", { error: v.error || r.status });
-  } catch (e) { setMessageText($("err"), "setup.step2.error.validation_request", { error: e }); }
-  $("addkey").disabled = false; setMessageText($("addkey"), "setup.step2.addkey");
-};
+/* --- Review (step 3) --- */
 
 function apiAccessMessageId() {
   return $("mintkey").checked
     ? "setup.step3.api_access_keyed"
     : "setup.step3.api_access_open";
 }
+
 $("to3").onclick = () => {
-  const base = $("baseurl").value.trim();
-  const poolRpm = keys.reduce((a,k)=>a+k.rpm,0);
-  const reviewRow = (labelId, value, valueId, messageId, params = {}) => {
-    const row = document.createElement("div");
-    const label = document.createElement("span");
-    label.className = "k";
-    setMessageText(label, labelId);
-    const display = document.createElement("span");
-    if (valueId) display.id = valueId;
-    if (messageId) setMessageText(display, messageId, params);
-    else display.textContent = value;
-    row.append(label, display);
-    return row;
-  };
-  $("review").replaceChildren(
-    reviewRow(
-      "setup.step3.review.superuser",
-      $("username").value.trim(),
-    ),
-    reviewRow(
-      "setup.step3.review.keys",
-      "",
-      "",
-      "setup.step3.review.keys_value",
-      {
-        count: keys.length,
-        rpm: poolRpm,
-      },
-    ),
-    reviewRow(
-      "setup.step3.review.upstream",
-      base || "https://integrate.api.nvidia.com",
-    ),
-    reviewRow(
-      "setup.step3.review.api_access",
-      "",
-      "apiline",
-      apiAccessMessageId(),
-    ),
-  );
+  const review = $("review");
+  review.innerHTML = "";
+
+  // Superuser row
+  const suRow = document.createElement("div");
+  const suLabel = document.createElement("span"); suLabel.className = "k";
+  setMessageText(suLabel, "setup.step3.review.superuser");
+  const suValue = document.createElement("span");
+  suValue.textContent = $("username").value.trim();
+  suRow.append(suLabel, suValue);
+  review.appendChild(suRow);
+
+  // Per-group rows
+  let totalKeys = 0, totalRpm = 0;
+  groups.forEach((g, i) => {
+    totalKeys += g.keys.length;
+    totalRpm += g.keys.reduce((a, k) => a + k.rpm, 0);
+    const gRow = document.createElement("div");
+    const gLabel = document.createElement("span"); gLabel.className = "k";
+    setMessageText(gLabel, "setup.step3.review.group", { name: g.name || ("Provider " + (i + 1)) });
+    const gValue = document.createElement("span");
+    setMessageText(gValue, "setup.step3.review.keys_value", { count: g.keys.length, rpm: g.keys.reduce((a, k) => a + k.rpm, 0) });
+    gRow.append(gLabel, gValue);
+    review.appendChild(gRow);
+  });
+
+  // Summary row
+  const sumRow = document.createElement("div");
+  const sumLabel = document.createElement("span"); sumLabel.className = "k";
+  setMessageText(sumLabel, "setup.step3.review.keys");
+  const sumValue = document.createElement("span");
+  setMessageText(sumValue, "setup.step3.review.groups_summary", { count: groups.length, keys: totalKeys });
+  sumRow.append(sumLabel, sumValue);
+  review.appendChild(sumRow);
+
+  // API access row
+  const apiRow = document.createElement("div");
+  const apiLabel = document.createElement("span"); apiLabel.className = "k";
+  setMessageText(apiLabel, "setup.step3.review.api_access");
+  const apiValue = document.createElement("span");
+  apiValue.id = "apiline";
+  setMessageText(apiValue, apiAccessMessageId());
+  apiRow.append(apiLabel, apiValue);
+  review.appendChild(apiRow);
+
   show(3);
 };
+
 $("mintkey").onchange = () => {
   $("mintwarn").hidden = $("mintkey").checked;
   const line = document.getElementById("apiline");
   if (line) setMessageText(line, apiAccessMessageId());
 };
 
-// Final screen: base URL + the once-only secret, with copy buttons.
+/* --- Final screen --- */
+
 function showConnect(secret) {
   [1,2,3].forEach(i => { $("step"+i).hidden = true; $("s"+i).classList.add("on"); });
   setErrorText("");
@@ -288,8 +383,6 @@ function showConnect(secret) {
 }
 document.querySelectorAll("[data-copy]").forEach(b => {
   b.onclick = async () => {
-    // Never claim "Copied" when the write failed (no clipboard API on a
-    // plain-http remote) — this is a once-only secret.
     try { await navigator.clipboard.writeText($(b.dataset.copy).textContent); setMessageText(b, "setup.step4.copied"); }
     catch { setMessageText(b, "setup.step4.select_copy"); }
     setTimeout(() => { setMessageText(b, "setup.step4.copy"); }, 1500);
@@ -297,16 +390,20 @@ document.querySelectorAll("[data-copy]").forEach(b => {
 });
 $("opendash").onclick = () => { window.location = "/"; };
 
+/* --- Form submit --- */
+
 $("wiz").onsubmit = async (ev) => {
   ev.preventDefault();
   $("finish").disabled = true;
   const body = {
     username: $("username").value.trim(),
     password: $("password").value,
-    nim_keys: keys.map(k => ({ key: k.key, rpm: k.rpm })),
+    groups: groups.map((g, i) => ({
+      name: g.name.trim() || ("Provider " + (i + 1)),
+      base_url: g.base_url.trim() || "https://integrate.api.nvidia.com",
+      keys: g.keys.map(k => ({ key: k.key, rpm: k.rpm })),
+    })),
   };
-  const base = $("baseurl").value.trim();
-  if (base) body.base_url = base;
   if ($("mintkey").checked) body.create_client_key = { name: "default" };
   try {
     const r = await fetch("/setup", { method: "POST",
