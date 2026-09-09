@@ -71,7 +71,7 @@ function render() {
   const wreq = windowed(s => sum(s.rows, 'nimproxy_requests_total'));
   const wok = windowed(s => sum(s.rows, 'nimproxy_requests_total', l => IS_2XX(l.status)));
   const okRatio = wreq ? wok/wreq : 1;
-  const okColor = okRatio < 0.9 ? css('--red') : okRatio < 0.99 ? css('--amber') : css('--green');
+  const okColor = okRatio < 0.9 ? css('--red') : okRatio < 0.99 ? css('--amber') : css('--accent');
 
   /* ----- shared client aggregates ----- */
   const cReq = wgroups('nimproxy_requests_total', 'client');
@@ -192,7 +192,7 @@ function renderOverview(c) {
     return `<div><div data-style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px">` +
       `<span data-style="font-size:12.5px;color:var(--ink-2)">${escapeHtml(label)}</span><span data-style="font:400 10px var(--mono);color:var(--ink-3)">${escapeHtml(note)}</span></div>` +
       `<div class="ptrack">${isFinite(p50) ? `<div class="p50" data-style="left:${pos(p50)}"></div>` : ''}${isFinite(p95) ? `<div class="p95" data-style="left:${pos(p95)}"></div>` : ''}</div>` +
-      `<div class="pvals"><div><div class="l">p50</div><div class="v" data-style="color:var(--green-lt)">${fmtV(p50)}</div></div>` +
+      `<div class="pvals"><div><div class="l">p50</div><div class="v" data-style="color:var(--accent-lt)">${fmtV(p50)}</div></div>` +
       `<div data-style="text-align:right"><div class="l">p95</div><div class="v" data-style="color:var(--ink-2)">${fmtV(p95)}</div></div></div></div>`;
   };
   const q = (metric, f) => { const b = wbuckets(metric, f); return [quantile(b, 0.5), quantile(b, 0.95)]; };
@@ -442,7 +442,7 @@ function renderReliability(c) {
     : Math.min(100, (1 - availability) / (1 - slo) * 100);
   $('r-avail').innerHTML =
     `<div class="hlabel">${escapeHtml(catalogMessage('dashboard.reliability.hero.availability'))} <span class="note">${escapeHtml(windowLabel)}</span></div>
-    <div class="hbig" data-style="color:${met ? 'var(--green-lt)' : 'var(--red)'};margin-top:8px">${availTxt}</div>
+    <div class="hbig" data-style="color:${met ? 'var(--accent-lt)' : 'var(--red)'};margin-top:8px">${availTxt}</div>
     <div data-style="font:400 11px var(--mono);color:var(--ink-3);margin-top:2px">${escapeHtml(sloLine(slo, eligible, met))}</div>
     <div data-style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink-25);margin:16px 0 6px">${escapeHtml(catalogMessage('dashboard.reliability.hero.error_budget'))}<span data-style="font:500 11px var(--mono);color:var(--ink-2)">${escapeHtml(catalogMessage('dashboard.reliability.hero.budget_used', { pct: budget.toFixed(0) + '%' }))}</span></div>
     <div class="htrack"><span data-style="width:${stylePercent(budget)};background:${budget >= 100 ? 'var(--red)' : 'var(--amber)'}"></span></div>`;
@@ -456,7 +456,7 @@ function renderReliability(c) {
     const segs = [
       { label: catalogMessage('dashboard.reliability.col.queue_wait'), v: qw, color: 'var(--amber)' },
       { label: catalogMessage('dashboard.reliability.col.first_token'), v: isFinite(ttft) ? ttft : 0, color: 'var(--blue)' },
-      { label: catalogMessage('dashboard.reliability.col.generation'), v: gen, color: 'var(--green)' },
+      { label: catalogMessage('dashboard.reliability.col.generation'), v: gen, color: 'var(--accent)' },
     ].filter(s => s.v > 0);
     const tot = segs.reduce((a, s) => a + s.v, 0) || 1;
     $('r-time').innerHTML =
@@ -488,16 +488,16 @@ function renderReliability(c) {
   const taxTot = taxCounts.reduce((a, x) => a + x.n, 0) || 1;
   $('r-load').innerHTML =
     `<div data-style="display:flex;gap:20px">
-      <div><div class="tlabel">${escapeHtml(catalogMessage('dashboard.common.row.active_now'))}</div><div data-style="font-size:26px;font-weight:600;color:var(--green)">${fmt(act)}</div></div>
+      <div><div class="tlabel">${escapeHtml(catalogMessage('dashboard.common.row.active_now'))}</div><div data-style="font-size:26px;font-weight:600;color:var(--accent)">${fmt(act)}</div></div>
       <div><div class="tlabel">${escapeHtml(catalogMessage('dashboard.common.row.queued'))}</div><div data-style="font-size:26px;font-weight:600;color:var(--amber)">${fmt(que)}</div></div>
     </div>
-    <div class="segbar" data-style="height:8px;border-radius:99px;margin:12px 0">${act + que ? `<div data-style="width:${stylePercent(act / (act + que) * 100)};background:var(--green)"></div><div data-style="width:${stylePercent(que / (act + que) * 100)};background:var(--amber)"></div>` : '<div data-style="width:100%;background:var(--track)"></div>'}</div>
+    <div class="segbar" data-style="height:8px;border-radius:99px;margin:12px 0">${act + que ? `<div data-style="width:${stylePercent(act / (act + que) * 100)};background:var(--accent)"></div><div data-style="width:${stylePercent(que / (act + que) * 100)};background:var(--amber)"></div>` : '<div data-style="width:100%;background:var(--track)"></div>'}</div>
     <div data-style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--hairline)"><span class="tlabel">${escapeHtml(catalogMessage('dashboard.common.row.error_rate'))}</span><span data-style="font:600 15px var(--mono);color:${errN ? 'var(--red)' : 'var(--ink-3)'}">${wreq ? pctOf(errN / wreq, 1) : NO_VALUE}</span></div>
     <div class="segbar" data-style="height:6px;border-radius:99px;margin-top:8px;gap:1px">${taxCounts.length ? taxCounts.map(x => `<div data-style="width:${stylePercent(x.n / taxTot * 100, 1)};background:${x.color}" title="${escapeHtml(x.label)}: ${fmt(x.n)}"></div>`).join('') : '<div data-style="width:100%;background:var(--track)"></div>'}</div>`;
 
   lineChart($('chart-reqrate'), [{ name: catalogMessage('dashboard.chart.requests_per_min'), color: MED, pts: reqPts, area: true }], fmt, { height: 150 });
   const outcomeSeries = [
-    { name: catalogMessage('dashboard.chart.success'), color: css('--green'), f: l => IS_2XX(l.status) },
+    { name: catalogMessage('dashboard.chart.success'), color: css('--accent'), f: l => IS_2XX(l.status) },
     { name: catalogMessage('dashboard.chart.errors'), color: css('--red'), f: l => IS_ERR(l.status) },
     { name: catalogMessage('dashboard.chart.disconnects'), color: css('--amber'), f: l => l.status === 'disconnect' },
   ].map(({ name, color, f }) => ({ name, color, pts: rateSeries(s => sum(s.rows, 'nimproxy_requests_total', f)) }));
@@ -508,7 +508,7 @@ function renderReliability(c) {
      status lands in exactly one band. */
   // These become series names; stackChart and legend escape them at HTML sinks.
   const OUTCOMES = [
-    [catalogMessage('dashboard.common.status.success'), css('--green'), IS_2XX],
+    [catalogMessage('dashboard.common.status.success'), css('--accent'), IS_2XX],
     [catalogMessage('dashboard.common.status.rate_limited'), css('--amber'), s => s === '429'],
     [catalogMessage('dashboard.common.status.disconnect'), css('--blue'), s => s === 'disconnect'],
     [catalogMessage('dashboard.common.status.timeout_stall'), css('--red'), s => s === '504' || s === 'stall'],
@@ -524,7 +524,7 @@ function renderReliability(c) {
   stackChart($('chart-outcome-stack'), stackSeries, fmt, { height: 200 });
   legend($('legend-outcome-stack'), stackSeries);
   const loadSeries = [
-    { name: catalogMessage('dashboard.chart.active'), color: css('--green'), pts: samples.map(s => ({ t: s.t, v: sum(s.rows, 'nimproxy_active_requests') })) },
+    { name: catalogMessage('dashboard.chart.active'), color: css('--accent'), pts: samples.map(s => ({ t: s.t, v: sum(s.rows, 'nimproxy_active_requests') })) },
     { name: catalogMessage('dashboard.chart.queued'), color: css('--amber'), pts: samples.map(s => ({ t: s.t, v: sum(s.rows, 'nimproxy_queue_depth') })) },
   ];
   lineChart($('chart-load'), loadSeries, fmt, { height: 150 });
@@ -618,7 +618,8 @@ function renderReliability(c) {
 }
 
 /* ===== capacity (was Keys) ===== */
-const LANE_COLORS = ['#76B900', '#4D6BFE', '#D9A521', '#16B8C0', '#615CED', '#EE6002'];
+function laneColors() { return [css('--accent') || '#7C5CFC', css('--cyan') || '#22D3EE', css('--amber') || '#D9A521', css('--blue') || '#4D6BFE', '#615CED', '#EE6002']; }
+const LANE_COLORS = laneColors();
 /* Which plural form a count takes is CLDR data, like the weekday names above:
    Intl.PluralRules already knows it for every locale, so `n === 1 ? '' : 's'`
    would be English grammar hardcoded into the render path. The source catalog
@@ -724,12 +725,12 @@ function renderCapacity(c) {
     <span class="note" data-style="font:400 10px var(--mono);color:var(--ink-3)">${escapeHtml(catalogMessage('dashboard.capacity.note.current_vs_capacity'))}</span>
     <span data-style="margin-left:auto;font-size:30px;font-weight:600;letter-spacing:-1px;color:${capColor}">${Math.round(satPct * 100)}%</span></div>
     <div data-style="position:relative;height:20px;background:var(--track);border-radius:6px;overflow:hidden;margin:16px 0 8px">
-      <div data-style="position:absolute;inset:0;width:${stylePercent(satPct * 100, 1)};background:linear-gradient(90deg,var(--green-dk),var(--green));border-radius:6px"></div>
+      <div data-style="position:absolute;inset:0;width:${stylePercent(satPct * 100, 1)};background:linear-gradient(90deg,var(--accent-dk),var(--accent));border-radius:6px"></div>
     </div>
     <div data-style="display:flex;justify-content:space-between;font:400 11px var(--mono);color:var(--ink-3)">
       <span data-style="color:var(--ink-2)">${fmt(rpmNow)} / ${fmt(capacity)} rpm</span>
       <span>${escapeHtml(enabledKeys(cfg.lanes))}</span>
-      <span data-style="color:var(--green-lt)">${fmt(headroom)} ${escapeHtml(catalogMessage('dashboard.capacity.note.rpm_available'))}</span>
+      <span data-style="color:var(--accent-lt)">${fmt(headroom)} ${escapeHtml(catalogMessage('dashboard.capacity.note.rpm_available'))}</span>
     </div>`;
 
   /* Historical comparisons use each bucket's capacity at the time.

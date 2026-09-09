@@ -111,7 +111,7 @@ applyDynamicStyles(document);
    Catalog values remain plain Unicode text. Native DOM sinks own ordinary
    element and text-bearing attribute contexts. A branded catalog descriptor
    is inert until the fixed-markup HTML sink resolves and escapes it. */
-const EMERGENCY_MESSAGE = 'NIM Proxy interface failed to load.';
+const EMERGENCY_MESSAGE = 'Open Proxy interface failed to load.';
 let I18N;
 let MSG;
 function failInterface() {
@@ -258,9 +258,10 @@ function applyStatic(root) {
   });
 }
 
-// Sequential green ramp for the heatmap (dark → bright = more).
-const RAMP = ['#141A0E','#233312','#33501A','#4E7A0F','#76B900','#A7D65A'];
-const MED = '#A7D65A', P95 = '#6F7767';   // quantile pair: filled median, muted p95
+// Sequential cyan ramp for the heatmap (dark → bright = more). Reads from theme tokens.
+function themeRamp() { return ['#0B1620', css('--cyan-dk') || '#0E2A38', '#155A74', css('--cyan-dk') || '#0E7490', css('--cyan') || '#22D3EE', css('--cyan-lt') || '#A5F3FC']; }
+const RAMP = themeRamp();
+const MED = '#A5F3FC', P95 = '#758199';   // quantile pair: filled median, muted p95
 
 /* ---------- formatting ----------
    Numbers, durations and dates follow the CATALOG's locale, not the browser's.
@@ -846,7 +847,7 @@ function sparkSvg(pts, hero) {
   const d = vs.map((v, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ',' + Y(v).toFixed(1)).join('');
   return `<svg class="kpispark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">` +
     `<path d="${d}L${W},${H}L0,${H}Z" fill="url(#gMuted)"/>` +
-    `<path d="${d}" fill="none" stroke="#8E967F" stroke-width="1.5"/></svg>`;
+    `<path d="${d}" fill="none" stroke="#8B98AE" stroke-width="1.5"/></svg>`;
 }
 /* trend chip: second half of the window vs the first half */
 function deltaChip(pts, downIsGood) {
@@ -930,6 +931,8 @@ function publisher(model) {
   const p = Object.prototype.hasOwnProperty.call(PUBLISHERS, key) ? PUBLISHERS[key] : null;
   if (p) return p;
   const name = ns || 'unknown';
+  // Fallback hue is pinned by the render gate's prototype-isolation probe
+  // (render_check.js): it must stay exactly this value.
   return { name, slug: null, color: '#5A6150' };
 }
 function prettyName(model) {
@@ -944,7 +947,7 @@ function chipHtml(pub) {
 }
 /* known-client colors, stable hash-to-hue for the rest */
 const CLIENT_COLORS = {
-  'claude-code': '#C15F3C', 'aider': '#2E7D5B', 'opencode': '#5A6150', 'cline': '#4D6BFE',
+  'claude-code': '#C15F3C', 'aider': '#2E7D5B', 'opencode': '#525E75', 'cline': '#4D6BFE',
   'continue': '#615CED', 'cursor': '#2E96FF', 'roo-code': '#EE6002', 'zed': '#16B8C0',
   'codex': '#10A37F', 'n8n': '#EA4B71',
 };
