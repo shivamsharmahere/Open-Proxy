@@ -8,7 +8,6 @@ import { Bento } from "@/components/landing/bento";
 import { Endpoint } from "@/components/landing/endpoint";
 import { DashboardSection, PrivacyBand } from "@/components/landing/dashboard";
 import { Infra, Security } from "@/components/landing/infra";
-import { LoadTest } from "@/components/landing/loadtest";
 import { Audience } from "@/components/landing/audience";
 import { Quickstart } from "@/components/landing/quickstart";
 import { FinalCta, Footer } from "@/components/landing/final";
@@ -30,7 +29,6 @@ export default function Home() {
         <PrivacyBand />
         <Infra />
         <Security />
-        <LoadTest />
         <Audience />
         <Quickstart />
         <FinalCta />

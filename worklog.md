@@ -254,3 +254,20 @@ Verification:
 
 Stage Summary:
 - DONE. Desktop-only ScrollRail (progress fill + traveling glow dot + scroll-spy nodes with numbered labels + live % + skip-to-end/back-to-top) and the giant end-of-page "open-proxy" wordmark with scroll parallax are live on / (wordmark also on /docs). Spacing task recorded separately as Task 9. Files: scroll-rail.tsx (new), final.tsx, page.tsx, globals.css + section ids in pool/endpoint/infra/dashboard-adjacent components.
+
+---
+Task ID: 11
+Agent: main (Super Z)
+Task: Remove the "Bursts in. Violations out. Zero." load-test section
+
+Work Log:
+- Removed <LoadTest /> + its import from src/app/page.tsx (section sat between Security and Audience)
+- Deleted src/components/landing/loadtest.tsx (no other references anywhere in src/)
+- Scroll rail unaffected — load-test was never a rail node; flow now Infra -> Security -> Audience -> Quickstart -> FinalCta
+
+Verification:
+- bun run lint: clean; GET / 200
+- Browser: "Violations out" and "exit-non-zero" absent from rendered page; section count 14 -> 13; rail intact; no page errors
+
+Stage Summary:
+- DONE. Load-test section fully removed. Files: page.tsx, loadtest.tsx (deleted).
