@@ -1,0 +1,470 @@
+   301→   301→10. Then show how ridiculously simple deployment is
+   302→   302→
+   303→   303→Headline
+   304→   304→
+   305→   305→From zero to your own AI gateway in minutes.
+   306→   306→
+   307→   307→Something like:
+   308→   308→
+   309→   309→docker compose up -d
+   310→   310→
+   311→   311→Then:
+   312→   312→
+   313→   313→http://localhost:8000
+   314→   314→        ↓
+   315→   315→Create account
+   316→   316→        ↓
+   317→   317→Add API keys
+   318→   318→        ↓
+   319→   319→Get client key
+   320→   320→        ↓
+   321→   321→Point your agent at /v1
+   322→   322→
+   323→   323→Your first-run wizard already creates the superuser, validates an upstream key and can generate the first client key.
+   324→   324→
+   325→   325→That's a great onboarding story.
+   326→   326→
+   327→   327→11. You need a "Who is this for?" section
+   328→   328→
+   329→   329→This is important because you're trying to attract developers + users + potential customers.
+   330→   330→
+   331→   331→Headline
+   332→   332→
+   333→   333→Built for anyone running AI workloads.
+   334→   334→
+   335→   335→👨‍💻 AI Developers
+   336→   336→
+   337→   337→Stop rewriting your application every time you change providers or API keys.
+   338→   338→
+   339→   339→🤖 Agent Builders
+   340→   340→
+   341→   341→Keep OpenCode, Codex, n8n and autonomous agents running through rate limits and transient failures.
+   342→   342→
+   343→   343→🏢 Teams
+   344→   344→
+   345→   345→Share provider capacity without sharing API credentials.
+   346→   346→
+   347→   347→☁️ Infrastructure Teams
+   348→   348→
+   349→   349→Centralize routing, limits, reliability and observability behind one endpoint.
+   350→   350→
+   351→   351→The shared-pool/multi-user capability in your README makes the team angle legitimate.
+   352→   352→
+   353→   353→12. Then your strongest numerical proof
+   354→   354→
+   355→   355→You have a fantastic section hiding in the README:
+   356→   356→
+   357→   357→100 concurrent clients. Zero upstream rate violations.
+   358→   358→
+   359→   359→That deserves a huge visual treatment.
+   360→   360→
+   361→   361→For example:
+   362→   362→
+   363→   363→              LOAD TESTED
+   364→   364→
+   365→   365→                 100
+   366→   366→             concurrent
+   367→   367→               clients
+   368→   368→
+   369→   369→                  ↓
+   370→   370→
+   371→   371→              OPEN-PROXY
+   372→   372→
+   373→   373→                  ↓
+   374→   374→
+   375→   375→             0
+   376→   376→        upstream rate
+   377→   377→          violations
+   378→   378→
+   379→   379→Then:
+   380→   380→
+   381→   381→Tested against a mock upstream that strictly enforces per-key rate limits.
+   382→   382→
+   383→   383→Your README explicitly describes this test.
+   384→   384→
+   385→   385→Don't invent things like "99.99% uptime" unless you actually have production data.
+   386→   386→
+   387→   387→13. GitHub/developer credibility
+   388→   388→
+   389→   389→Since this is a developer product, I would put a GitHub-style section near the bottom.
+   390→   390→
+   391→   391→Headline
+   392→   392→
+   393→   393→Open source. Self-hosted. Yours to control.
+   394→   394→
+   395→   395→Then:
+   396→   396→
+   397→   397→MIT License
+   398→   398→
+   399→   399→GitHub
+   400→   400→Documentation
+   401→   401→Architecture
+   402→   402→Security
+   403→   403→Contributing
+   404→   404→
+   405→   405→Your README states MIT licensing and provides the knowledge base, contributing, security and support paths.
+   406→   406→
+   407→   407→14. Final CTA
+   408→   408→
+   409→   409→Don't end with:
+   410→   410→
+   411→   411→“Get started today!”
+   412→   412→
+   413→   413→That's generic SaaS language.
+   414→   414→
+   415→   415→I would end with:
+   416→   416→
+   417→   417→Give your agents one endpoint.
+   418→   418→
+   419→   419→Stop building rate-limit handling into every application.
+   420→   420→
+   421→   421→Connect your providers. Add your keys. Point your clients at open-proxy.
+   422→   422→
+   423→   423→[ Start Building ] [ View on GitHub ]
+   424→   424→
+   425→   425→OpenAI-compatible · Self-hosted · Multi-provider · Rate-limit aware
+   426→   426→
+   427→   427→The complete landing-page flow I'd use
+   428→   428→
+   429→   429→This is the structure I'd recommend:
+   430→   430→
+   431→   431→┌─────────────────────────────────────────────┐
+   432→   432→│ NAV                                         │
+   433→   433→│ open-proxy     Docs  GitHub  Dashboard      │
+   434→   434→│                         [Get Started]        │
+   435→   435→├─────────────────────────────────────────────┤
+   436→   436→│                                             │
+   437→   437→│        RUN AI AGENTS                        │
+   438→   438→│        WITHOUT FIGHTING                     │
+   439→   439→│        RATE LIMITS.                         │
+   440→   440→│                                             │
+   441→   441→│ One OpenAI-compatible endpoint for          │
+   442→   442→│ all your AI providers and API keys.         │
+   443→   443→│                                             │
+   444→   444→│ [Get Started] [GitHub]                      │
+   445→   445→│                                             │
+   446→   446→│     animated architecture                  │
+   447→   447→│                                             │
+   448→   448→├─────────────────────────────────────────────┤
+   449→   449→│                                             │
+   450→   450→│      YOUR API KEYS. ONE INTELLIGENT POOL.   │
+   451→   451→│                                             │
+   452→   452→│ NVIDIA ─┐                                   │
+   453→   453→│ OpenAI ─┼──► open-proxy ──► Your Agent      │
+   454→   454→│ Router ─┤                                   │
+   455→   455→│ Custom ─┘                                   │
+   456→   456→│                                             │
+   457→   457→├─────────────────────────────────────────────┤
+   458→   458→│                                             │
+   459→   459→│       NEVER BABYSIT A 429 AGAIN             │
+   460→   460→│                                             │
+   461→   461→│ Rate limits | Queues | Retries | Failover  │
+   462→   462→│ Affinity | Concurrency | Heartbeats         │
+   463→   463→│                                             │
+   464→   464→├─────────────────────────────────────────────┤
+   465→   465→│                                             │
+   466→   466→│      ONE ENDPOINT. ANY OPENAI CLIENT.       │
+   467→   467→│                                             │
+   468→   468→│ OpenCode | Codex | n8n | curl | Your app   │
+   469→   469→│                                             │
+   470→   470→├─────────────────────────────────────────────┤
+   471→   471→│                                             │
+   472→   472→│      STOP GUESSING WHAT YOUR AGENTS DO.     │
+   473→   473→│                                             │
+   474→   474→│             [Dashboard visual]              │
+   475→   475→│                                             │
+   476→   476→│ Overview | Models | Clients | Reliability  │
+   477→   477→│ Capacity                                    │
+   478→   478→│                                             │
+   479→   479→├─────────────────────────────────────────────┤
+   480→   480→│                                             │
+   481→   481→│       OBSERVE THE SYSTEM.                   │
+   482→   482→│       NOT THE CONVERSATION.                 │
+   483→   483→│                                             │
+   484→   484→├─────────────────────────────────────────────┤
+   485→   485→│                                             │
+   486→   486→│       SMALL ENOUGH TO RUN ANYWHERE.         │
+   487→   487→│       SERIOUS ENOUGH FOR PRODUCTION.        │
+   488→   488→│                                             │
+   489→   489→│  ~5 MB | FROM SCRATCH | ROOTLESS |         │
+   490→   490→│  PROMETHEUS | OPENAPI | GRACEFUL            │
+   491→   491→│                                             │
+   492→   492→├─────────────────────────────────────────────┤
+   493→   493→│                                             │
+   494→   494→│       BUILT FOR AI DEVELOPERS               │
+   495→   495→│       AGENT BUILDERS & TEAMS                │
+   496→   496→│                                             │
+   497→   497→├─────────────────────────────────────────────┤
+   498→   498→│                                             │
+   499→   499→│             100 CONCURRENT                  │
+   500→   500→│                  ↓                          │
+   501→   501→│               CLIENTS                       │
+   502→   502→│                  ↓                          │
+   503→   503→│              0 RATE                         │
+   504→   504→│              VIOLATIONS                     │
+   505→   505→│                                             │
+   506→   506→├─────────────────────────────────────────────┤
+   507→   507→│                                             │
+   508→   508→│       OPEN SOURCE. SELF-HOSTED. YOURS.     │
+   509→   509→│                                             │
+   510→   510→│             [GitHub]                        │
+   511→   511→│                                             │
+   512→   512→├─────────────────────────────────────────────┤
+   513→   513→│                                             │
+   514→   514→│          GIVE YOUR AGENTS                   │
+   515→   515→│          ONE ENDPOINT.                      │
+   516→   516→│                                             │
+   517→   517→│       [START BUILDING]                      │
+   518→   518→│                                             │
+   519→   519→└─────────────────────────────────────────────┘
+   520→   520→
+   521→   521→One thing I'd change from your current README positioning
+   522→   522→
+   523→   523→I think "One proxy, every provider, zero 429s" is excellent as a product concept, but it shouldn't necessarily be the entire landing-page message.
+   524→   524→
+   525→   525→The bigger story is:
+   526→   526→
+   527→   527→AI agents shouldn't have to know about provider limits.
+   528→   528→
+   529→   529→That's the emotional/product-level problem.
+   530→   530→
+   531→   531→So I'd build the brand around:
+   532→   532→
+   533→   533→Run AI agents without fighting rate limits.
+   534→   534→
+   535→   535→And make this the supporting message:
+   536→   536→
+   537→   537→One OpenAI-compatible endpoint. Every provider. Every key.
+   538→   538→
+   539→   539→Then the technical features prove that promise.
+   540→   540→
+   541→   541→That gives you a landing page that speaks to a junior developer in simple terms, while still giving a senior engineer enough depth to think "this isn't just another reverse proxy."
+   542→   542→
+   543→   543→
+   544→   544→
+   545→   545→this is the taste skill to be used got design thinking ---
+   546→   546→name: design-taste-frontend-v1
+   547→   547→description: The original v1 taste-skill, preserved for projects depending on its exact behavior. The current default is `design-taste-frontend` (v2 experimental), which is a substantial rewrite. Use this v1 install name only if you need exact backward compatibility.
+   548→   548→---
+   549→   549→
+   550→   550→High-Agency Frontend Skill
+   551→   551→
+   552→   552→1. ACTIVE BASELINE CONFIGURATION
+   553→   553→* DESIGN_VARIANCE: 8 (1=Perfect Symmetry, 10=Artsy Chaos)
+   554→   554→* MOTION_INTENSITY: 6 (1=Static/No movement, 10=Cinematic/Magic Physics)
+   555→   555→* VISUAL_DENSITY: 4 (1=Art Gallery/Airy, 10=Pilot Cockpit/Packed Data)
+   556→   556→
+   557→   557→AI Instruction: The standard baseline for all generations is strictly set to these values (8, 6, 4). Do not ask the user to edit this file. Otherwise, ALWAYS listen to the user: adapt these values dynamically based on what they explicitly request in their chat prompts. Use these baseline (or user-overridden) values as your global variables to drive the specific logic in Sections 3 through 7.
+   558→   558→
+   559→   559→2. DEFAULT ARCHITECTURE & CONVENTIONS
+   560→   560→Unless the user explicitly specifies a different stack, adhere to these structural constraints to maintain consistency:
+   561→   561→
+   562→   562→* DEPENDENCY VERIFICATION [MANDATORY]: Before importing ANY 3rd party library (e.g. `framer-motion`, `lucide-react`, `zustand`), you MUST check `package.json`. If the package is missing, you MUST output the installation command (e.g. `npm install package-name`) before providing the code. Never assume a library exists.
+   563→   563→* Framework & Interactivity: React or Next.js. Default to Server Components (`RSC`). 
+   564→   564→    * RSC SAFETY: Global state works ONLY in Client Components. In Next.js, wrap providers in a `"use client"` component.
+   565→   565→    * INTERACTIVITY ISOLATION: If Sections 4 or 7 (Motion/Liquid Glass) are active, the specific interactive UI component MUST be extracted as an isolated leaf component with `'use client'` at the very top. Server Components must exclusively render static layouts.
+   566→   566→* State Management: Use local `useState`/`useReducer` for isolated UI. Use global state strictly for deep prop-drilling avoidance.
+   567→   567→* Styling Policy: Use Tailwind CSS (v3/v4) for 90% of styling. 
+   568→   568→    * TAILWIND VERSION LOCK: Check `package.json` first. Do not use v4 syntax in v3 projects. 
+   569→   569→    * T4 CONFIG GUARD: For v4, do NOT use `tailwindcss` plugin in `postcss.config.js`. Use `@tailwindcss/postcss` or the Vite plugin.
+   570→   570→* ANTI-EMOJI POLICY [CRITICAL]: NEVER use emojis in code, markup, text content, or alt text. Replace symbols with high-quality icons (Radix, Phosphor) or clean SVG primitives. Emojis are BANNED.
+   571→   571→* Responsiveness & Spacing:
+   572→   572→  * Standardize breakpoints (`sm`, `md`, `lg`, `xl`).
+   573→   573→  * Contain page layouts using `max-w-[1400px] mx-auto` or `max-w-7xl`.
+   574→   574→  * Viewport Stability [CRITICAL]: NEVER use `h-screen` for full-height Hero sections. ALWAYS use `min-h-[100dvh]` to prevent catastrophic layout jumping on mobile browsers (iOS Safari).
+   575→   575→  * Grid over Flex-Math: NEVER use complex flexbox percentage math (`w-[calc(33%-1rem)]`). ALWAYS use CSS Grid (`grid grid-cols-1 md:grid-cols-3 gap-6`) for reliable structures.
+   576→   576→* Icons: You MUST use exactly `@phosphor-icons/react` or `@radix-ui/react-icons` as the import paths (check installed version). Standardize `strokeWidth` globally (e.g., exclusively use `1.5` or `2.0`).
+   577→   577→
+   578→   578→
+   579→   579→3. DESIGN ENGINEERING DIRECTIVES (Bias Correction)
+   580→   580→LLMs have statistical biases toward specific UI cliché patterns. Proactively construct premium interfaces using these engineered rules:
+   581→   581→
+   582→   582→Rule 1: Deterministic Typography
+   583→   583→* Display/Headlines: Default to `text-4xl md:text-6xl tracking-tighter leading-none`.
+   584→   584→    * ANTI-SLOP: Discourage `Inter` for "Premium" or "Creative" vibes. Force unique character using `Geist`, `Outfit`, `Cabinet Grotesk`, or `Satoshi`.
+   585→   585→    * TECHNICAL UI RULE: Serif fonts are strictly BANNED for Dashboard/Software UIs. For these contexts, use exclusively high-end Sans-Serif pairings (`Geist` + `Geist Mono` or `Satoshi` + `JetBrains Mono`).
+   586→   586→* Body/Paragraphs: Default to `text-base text-gray-600 leading-relaxed max-w-[65ch]`.
+   587→   587→
+   588→   588→Rule 2: Color Calibration
+   589→   589→* Constraint: Max 1 Accent Color. Saturation < 80%.
+   590→   590→* THE LILA BAN: The "AI Purple/Blue" aesthetic is strictly BANNED. No purple button glows, no neon gradients. Use absolute neutral bases (Zinc/Slate) with high-contrast, singular accents (e.g. Emerald, Electric Blue, or Deep Rose).
+   591→   591→* COLOR CONSISTENCY: Stick to one palette for the entire output. Do not fluctuate between warm and cool grays within the same project.
+   592→   592→
+   593→   593→Rule 3: Layout Diversification
+   594→   594→* ANTI-CENTER BIAS: Centered Hero/H1 sections are strictly BANNED when `DESIGN_VARIANCE > 4`. Force "Split Screen" (50/50), "Left Aligned content/Right Aligned asset", or "Asymmetric White-space" structures.
+   595→   595→
+   596→   596→Rule 4: Materiality, Shadows, and "Anti-Card Overuse"
+   597→   597→* DASHBOARD HARDENING: For `VISUAL_DENSITY > 7`, generic card containers are strictly BANNED. Use logic-grouping via `border-t`, `divide-y`, or purely negative space. Data metrics should breathe without being boxed in unless elevation (z-index) is functionally required.
+   598→   598→* Execution: Use cards ONLY when elevation communicates hierarchy. When a shadow is used, tint it to the background hue.
+   599→   599→
+   600→   600→Rule 5: Interactive UI States
+   601→   601→* Mandatory Generation: LLMs naturally generate "static" successful states. You MUST implement full interaction cycles:
+   602→   602→  * Loading: Skeletal loaders matching layout sizes (avoid generic circular spinners).
+   603→   603→  * Empty States: Beautifully composed empty states indicating how to populate data.
+   604→   604→  * Error States: Clear, inline error reporting (e.g., forms).
+   605→   605→  * Tactile Feedback: On `:active`, use `-translate-y-[1px]` or `scale-[0.98]` to simulate a physical push indicating success/action.
+   606→   606→
+   607→   607→Rule 6: Data & Form Patterns
+   608→   608→* Forms: Label MUST sit above input. Helper text is optional but should exist in markup. Error text below input. Use a standard `gap-2` for input blocks.
+   609→   609→
+   610→   610→4. CREATIVE PROACTIVITY (Anti-Slop Implementation)
+   611→   611→To actively combat generic AI designs, systematically implement these high-end coding concepts as your baseline:
+   612→   612→* "Liquid Glass" Refraction: When glassmorphism is needed, go beyond `backdrop-blur`. Add a 1px inner border (`border-white/10`) and a subtle inner shadow (`shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]`) to simulate physical edge refraction.
+   613→   613→* Magnetic Micro-physics (If MOTION_INTENSITY > 5): Implement buttons that pull slightly toward the mouse cursor. CRITICAL: NEVER use React `useState` for magnetic hover or continuous animations. Use EXCLUSIVELY Framer Motion's `useMotionValue` and `useTransform` outside the React render cycle to prevent performance collapse on mobile.
+   614→   614→* Perpetual Micro-Interactions: When `MOTION_INTENSITY > 5`, embed continuous, infinite micro-animations (Pulse, Typewriter, Float, Shimmer, Carousel) in standard components (avatars, status dots, backgrounds). Apply premium Spring Physics (`type: "spring", stiffness: 100, damping: 20`) to all interactive elements—no linear easing.
+   615→   615→* Layout Transitions: Always utilize Framer Motion's `layout` and `layoutId` props for smooth re-ordering, resizing, and shared element transitions across state changes.
+   616→   616→* Staggered Orchestration: Do not mount lists or grids instantly. Use `staggerChildren` (Framer) or CSS cascade (`animation-delay: calc(var(--index) * 100ms)`) to create sequential waterfall reveals. CRITICAL: For `staggerChildren`, the Parent (`variants`) and Children MUST reside in the identical Client Component tree. If data is fetched asynchronously, pass the data as props into a centralized Parent Motion wrapper.
+   617→   617→
+   618→   618→5. PERFORMANCE GUARDRAILS
+   619→   619→* DOM Cost: Apply grain/noise filters exclusively to fixed, pointer-event-none pseudo-elements (e.g., `fixed inset-0 z-50 pointer-events-none`) and NEVER to scrolling containers to prevent continuous GPU repaints and mobile performance degradation.
+   620→   620→* Hardware Acceleration: Never animate `top`, `left`, `width`, or `height`. Animate exclusively via `transform` and `opacity`.
+   621→   621→* Z-Index Restraint: NEVER spam arbitrary `z-50` or `z-10` unprompted. Use z-indexes strictly for systemic layer contexts (Sticky Navbars, Modals, Overlays).
+   622→   622→
+   623→   623→6. TECHNICAL REFERENCE (Dial Definitions)
+   624→   624→
+   625→   625→DESIGN_VARIANCE (Level 1-10)
+   626→   626→* 1-3 (Predictable): Flexbox `justify-center`, strict 12-column symmetrical grids, equal paddings.
+   627→   627→* 4-7 (Offset): Use `margin-top: -2rem` overlapping, varied image aspect ratios (e.g., 4:3 next to 16:9), left-aligned headers over center-aligned data.
+   628→   628→* 8-10 (Asymmetric): Masonry layouts, CSS Grid with fractional units (e.g., `grid-template-columns: 2fr 1fr 1fr`), massive empty zones (`padding-left: 20vw`). 
+   629→   629→* MOBILE OVERRIDE: For levels 4-10, any asymmetric layout above `md:` MUST aggressively fall back to a strict, single-column layout (`w-full`, `px-4`, `py-8`) on viewports `< 768px` to prevent horizontal scrolling and layout breakage.
+   630→   630→
+   631→   631→MOTION_INTENSITY (Level 1-10)
+   632→   632→* 1-3 (Static): No automatic animations. CSS `:hover` and `:active` states only.
+   633→   633→* 4-7 (Fluid CSS): Use `transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1)`. Use `animation-delay` cascades for load-ins. Focus strictly on `transform` and `opacity`. Use `will-change: transform` sparingly.
+   634→   634→* 8-10 (Advanced Choreography): Complex scroll-triggered reveals or parallax. Use Framer Motion hooks. NEVER use `window.addEventListener('scroll')`.
+   635→   635→
+   636→   636→VISUAL_DENSITY (Level 1-10)
+   637→   637→* 1-3 (Art Gallery Mode): Lots of white space. Huge section gaps. Everything feels very expensive and clean.
+   638→   638→* 4-7 (Daily App Mode): Normal spacing for standard web apps.
+   639→   639→* 8-10 (Cockpit Mode): Tiny paddings. No card boxes; just 1px lines to separate data. Everything is packed. Mandatory: Use Monospace (`font-mono`) for all numbers.
+   640→   640→
+   641→   641→7. AI TELLS (Forbidden Patterns)
+   642→   642→To guarantee a premium, non-generic output, you MUST strictly avoid these common AI design signatures unless explicitly requested:
+   643→   643→
+   644→   644→Visual & CSS
+   645→   645→* NO Neon/Outer Glows: Do not use default `box-shadow` glows or auto-glows. Use inner borders or subtle tinted shadows.
+   646→   646→* NO Pure Black: Never use `#000000`. Use Off-Black, Zinc-950, or Charcoal.
+   647→   647→* NO Oversaturated Accents: Desaturate accents to blend elegantly with neutrals.
+   648→   648→* NO Excessive Gradient Text: Do not use text-fill gradients for large headers.
+   649→   649→* NO Custom Mouse Cursors: They are outdated and ruin performance/accessibility.
+   650→   650→
+   651→   651→Typography
+   652→   652→* NO Inter Font: Banned. Use `Geist`, `Outfit`, `Cabinet Grotesk`, or `Satoshi`.
+   653→   653→* NO Oversized H1s: The first heading should not scream. Control hierarchy with weight and color, not just massive scale.
+   654→   654→* Serif Constraints: Use Serif fonts ONLY for creative/editorial designs. NEVER use Serif on clean Dashboards.
+   655→   655→
+   656→   656→Layout & Spacing
+   657→   657→* Align & Space Perfectly: Ensure padding and margins are mathematically perfect. Avoid floating elements with awkward gaps.
+   658→   658→* NO 3-Column Card Layouts: The generic "3 equal cards horizontally" feature row is BANNED. Use a 2-column Zig-Zag, asymmetric grid, or horizontal scrolling approach instead.
+   659→   659→
+   660→   660→Content & Data (The "Jane Doe" Effect)
+   661→   661→* NO Generic Names: "John Doe", "Sarah Chan", or "Jack Su" are banned. Use highly creative, realistic-sounding names.
+   662→   662→* NO Generic Avatars: DO NOT use standard SVG "egg" or Lucide user icons for avatars. Use creative, believable photo placeholders or specific styling.
+   663→   663→* NO Fake Numbers: Avoid predictable outputs like `99.99%`, `50%`, or basic phone numbers (`1234567`). Use organic, messy data (`47.2%`, `+1 (312) 847-1928`).
+   664→   664→* NO Startup Slop Names: "Acme", "Nexus", "SmartFlow". Invent premium, contextual brand names.
+   665→   665→* NO Filler Words: Avoid AI copywriting clichés like "Elevate", "Seamless", "Unleash", or "Next-Gen". Use concrete verbs.
+   666→   666→
+   667→   667→External Resources & Components
+   668→   668→* NO Broken Unsplash Links: Do not use Unsplash. Use absolute, reliable placeholders like `https://picsum.photos/seed/{random_string}/800/600` or SVG UI Avatars.
+   669→   669→* shadcn/ui Customization: You may use `shadcn/ui`, but NEVER in its generic default state. You MUST customize the radii, colors, and shadows to match the high-end project aesthetic.
+   670→   670→* Production-Ready Cleanliness: Code must be extremely clean, visually striking, memorable, and meticulously refined in every detail.
+   671→   671→
+   672→   672→8. THE CREATIVE ARSENAL (High-End Inspiration)
+   673→   673→Do not default to generic UI. Pull from this library of advanced concepts to ensure the output is visually striking and memorable. When appropriate, leverage GSAP (ScrollTrigger/Parallax) for complex scrolltelling or ThreeJS/WebGL for 3D/Canvas animations, rather than basic CSS motion. CRITICAL: Never mix GSAP/ThreeJS with Framer Motion in the same component tree. Default to Framer Motion for UI/Bento interactions. Use GSAP/ThreeJS EXCLUSIVELY for isolated full-page scrolltelling or canvas backgrounds, wrapped in strict useEffect cleanup blocks.
+   674→   674→
+   675→   675→The Standard Hero Paradigm
+   676→   676→* Stop doing centered text over a dark image. Try asymmetric Hero sections: Text cleanly aligned to the left or right. The background should feature a high-quality, relevant image with a subtle stylistic fade (darkening or lightening gracefully into the background color depending on if it is Light or Dark mode).
+   677→   677→
+   678→   678→Navigation & Menüs
+   679→   679→* Mac OS Dock Magnification: Nav-bar at the edge; icons scale fluidly on hover.
+   680→   680→* Magnetic Button: Buttons that physically pull toward the cursor.
+   681→   681→* Gooey Menu: Sub-items detach from the main button like a viscous liquid.
+   682→   682→* Dynamic Island: A pill-shaped UI component that morphs to show status/alerts.
+   683→   683→* Contextual Radial Menu: A circular menu expanding exactly at the click coordinates.
+   684→   684→* Floating Speed Dial: A FAB that springs out into a curved line of secondary actions.
+   685→   685→* Mega Menu Reveal: Full-screen dropdowns that stagger-fade complex content.
+   686→   686→
+   687→   687→Layout & Grids
+   688→   688→* Bento Grid: Asymmetric, tile-based grouping (e.g., Apple Control Center).
+   689→   689→* Masonry Layout: Staggered grid without fixed row heights (e.g., Pinterest).
+   690→   690→* Chroma Grid: Grid borders or tiles showing subtle, continuously animating color gradients.
+   691→   691→* Split Screen Scroll: Two screen halves sliding in opposite directions on scroll.
+   692→   692→* Curtain Reveal: A Hero section parting in the middle like a curtain on scroll.
+   693→   693→
+   694→   694→Cards & Containers
+   695→   695→* Parallax Tilt Card: A 3D-tilting card tracking the mouse coordinates.
+   696→   696→* Spotlight Border Card: Card borders that illuminate dynamically under the cursor.
+   697→   697→* Glassmorphism Panel: True frosted glass with inner refraction borders.
+   698→   698→* Holographic Foil Card: Iridescent, rainbow light reflections shifting on hover.
+   699→   699→* Tinder Swipe Stack: A physical stack of cards the user can swipe away.
+   700→   700→* Morphing Modal: A button that seamlessly expands into its own full-screen dialog container.
+   701→   701→
+   702→   702→Scroll-Animations
+   703→   703→* Sticky Scroll Stack: Cards that stick to the top and physically stack over each other.
+   704→   704→* Horizontal Scroll Hijack: Vertical scroll translates into a smooth horizontal gallery pan.
+   705→   705→* Locomotive Scroll Sequence: Video/3D sequences where framerate is tied directly to the scrollbar.
+   706→   706→* Zoom Parallax: A central background image zooming in/out seamlessly as you scroll.
+   707→   707→* Scroll Progress Path: SVG vector lines or routes that draw themselves as the user scrolls.
+   708→   708→* Liquid Swipe Transition: Page transitions that wipe the screen like a viscous liquid.
+   709→   709→
+   710→   710→Galleries & Media
+   711→   711→* Dome Gallery: A 3D gallery feeling like a panoramic dome.
+   712→   712→* Coverflow Carousel: 3D carousel with the center focused and edges angled back.
+   713→   713→* Drag-to-Pan Grid: A boundless grid you can freely drag in any compass direction.
+   714→   714→* Accordion Image Slider: Narrow vertical/horizontal image strips that expand fully on hover.
+   715→   715→* Hover Image Trail: The mouse leaves a trail of popping/fading images behind it.
+   716→   716→* Glitch Effect Image: Brief RGB-channel shifting digital distortion on hover.
+   717→   717→
+   718→   718→Typography & Text
+   719→   719→* Kinetic Marquee: Endless text bands that reverse direction or speed up on scroll.
+   720→   720→* Text Mask Reveal: Massive typography acting as a transparent window to a video background.
+   721→   721→* Text Scramble Effect: Matrix-style character decoding on load or hover.
+   722→   722→* Circular Text Path: Text curved along a spinning circular path.
+   723→   723→* Gradient Stroke Animation: Outlined text with a gradient continuously running along the stroke.
+   724→   724→* Kinetic Typography Grid: A grid of letters dodging or rotating away from the cursor.
+   725→   725→
+   726→   726→Micro-Interactions & Effects
+   727→   727→* Particle Explosion Button: CTAs that shatter into particles upon success.
+   728→   728→* Liquid Pull-to-Refresh: Mobile reload indicators acting like detaching water droplets.
+   729→   729→* Skeleton Shimmer: Shifting light reflections moving across placeholder boxes.
+   730→   730→* Directional Hover Aware Button: Hover fill entering from the exact side the mouse entered.
+   731→   731→* Ripple Click Effect: Visual waves rippling precisely from the click coordinates.
+   732→   732→* Animated SVG Line Drawing: Vectors that draw their own contours in real-time.
+   733→   733→* Mesh Gradient Background: Organic, lava-lamp-like animated color blobs.
+   734→   734→* Lens Blur Depth: Dynamic focus blurring background UI layers to highlight a foreground action.
+   735→   735→
+   736→   736→9. THE "MOTION-ENGINE" BENTO PARADIGM
+   737→   737→When generating modern SaaS dashboards or feature sections, you MUST utilize the following "Bento 2.0" architecture and motion philosophy. This goes beyond static cards and enforces a "Vercel-core meets Dribbble-clean" aesthetic heavily reliant on perpetual physics.
+   738→   738→
+   739→   739→A. Core Design Philosophy
+   740→   740→* Aesthetic: High-end, minimal, and functional.
+   741→   741→* Palette: Background in `#f9fafb`. Cards are pure white (`#ffffff`) with a 1px border of `border-slate-200/50`.
+   742→   742→* Surfaces: Use `rounded-[2.5rem]` for all major containers. Apply a "diffusion shadow" (a very light, wide-spreading shadow, e.g., `shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)]`) to create depth without clutter.
+   743→   743→* Typography: Strict `Geist`, `Satoshi`, or `Cabinet Grotesk` font stack. Use subtle tracking (`tracking-tight`) for headers.
+   744→   744→* Labels: Titles and descriptions must be placed outside and below the cards to maintain a clean, gallery-style presentation.
+   745→   745→* Pixel-Perfection: Use generous `p-8` or `p-10` padding inside cards.
+   746→   746→
+   747→   747→B. The Animation Engine Specs (Perpetual Motion)
+   748→   748→All cards must contain "Perpetual Micro-Interactions." Use the following Framer Motion principles:
+   749→   749→* Spring Physics: No linear easing. Use `type: "spring", stiffness: 100, damping: 20` for a premium, weighty feel.
+   750→   750→* Layout Transitions: Heavily utilize the `layout` and `layoutId` props to ensure smooth re-ordering, resizing, and shared element state transitions.
+   751→   751→* Infinite Loops: Every card must have an "Active State" that loops infinitely (Pulse, Typewriter, Float, or Carousel) to ensure the dashboard feels "alive".
+   752→   752→* Performance: Wrap dynamic lists in `<AnimatePresence>` and optimize for 60fps. PERFORMANCE CRITICAL: Any perpetual motion or infinite loop MUST be memoized (React.memo) and completely isolated in its own microscopic Client Component. Never trigger re-renders in the parent layout.
+   753→   753→
+   754→   754→C. The 5-Card Archetypes (Micro-Animation Specs)
+   755→   755→Implement these specific micro-animations when constructing Bento grids (e.g., Row 1: 3 cols | Row 2: 2 cols split 70/30):
+   756→   756→1. The Intelligent List: A vertical stack of items with an infinite auto-sorting loop. Items swap positions using `layoutId`, simulating an AI prioritizing tasks in real-time.
+   757→   757→2. The Command Input: A search/AI bar with a multi-step Typewriter Effect. It cycles through complex prompts, including a blinking cursor and a "processing" state with a shimmering loading gradient.
+   758→   758→3. The Live Status: A scheduling interface with "breathing" status indicators. Include a pop-up notification badge that emerges with an "Overshoot" spring effect, stays for 3 seconds, and vanishes.
+   759→   759→4. The Wide Data Stream: A horizontal "Infinite Carousel" of data cards or metrics. Ensure the loop is seamless (using `x: ["0%", "-100%"]`) with a speed that feels effortless.
+   760→   760→5. The Contextual UI (Focus Mode): A document view that animates a staggered highlight of a text block, followed by a "Float-in" of a floating action toolbar with micro-icons.
+   761→   761→
+   762→   762→10. FINAL PRE-FLIGHT CHECK
+   763→   763→Evaluate your code against this matrix before outputting. This is the last filter you apply to your logic.
+   764→   764→- [ ] Is global state used appropriately to avoid deep prop-drilling rather than arbitrarily?
+   765→   765→- [ ] Is mobile layout collapse (`w-full`, `px-4`, `max-w-7xl mx-auto`) guaranteed for high-variance designs?
+   766→   766→- [ ] Do full-height sections safely use `min-h-[100dvh]` instead of the bugged `h-screen`?
+   767→   767→- [ ] Do `useEffect` animations contain strict cleanup functions?
+   768→   768→- [ ] Are empty, loading, and error states provided?
+   769→   769→- [ ] Are cards omitted in favor of spacing where possible?
+   770→   770→- [ ] Did you strictly isolate CPU-heavy perpetual animations in their own Client Components?

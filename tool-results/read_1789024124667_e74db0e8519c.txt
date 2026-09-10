@@ -1,0 +1,402 @@
+     1→     1→     1→<div align="center">
+     2→     2→     2→
+     3→     3→     3→<img src="docs/assets/logo.png" alt="open-proxy" width="140">
+     4→     4→     4→
+     5→     5→     5→# open-proxy
+     6→     6→     6→
+     7→     7→     7→**A tiny, multi-provider, rate-limit-aware OpenAI-compatible proxy. One proxy, every provider, zero 429s.**
+     8→     8→     8→Add API keys from NVIDIA NIM, OpenRouter, TokenRouter, OpenAI, or any OpenAI-compatible API — open-proxy merges them into a single pool, obeys every upstream's speed limit, and keeps your clients running.
+     9→     9→     9→
+    10→    10→    10→[![CI](https://github.com/miztertea/nim-proxy/actions/workflows/ci.yml/badge.svg)](https://github.com/miztertea/nim-proxy/actions/workflows/ci.yml)
+    11→    11→    11→[![Release](https://img.shields.io/github/v/release/miztertea/nim-proxy)](https://github.com/miztertea/nim-proxy/releases/latest)
+    12→    12→    12→[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/miztertea/nim-proxy/badge)](https://scorecard.dev/viewer/?uri=github.com/miztertea/nim-proxy)
+    13→    13→    13→[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13484/badge)](https://www.bestpractices.dev/projects/13484)
+    14→    14→    14→[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+    15→    15→    15→
+    16→    16→    16→<img src="docs/assets/dashboard-overview.png" alt="The open-proxy dashboard: Overview tab" width="850">
+    17→    17→    17→
+    18→    18→    18→</div>
+    19→    19→    19→
+    20→    20→    20→---
+    21→    21→    21→
+    22→    22→    22→Every upstream provider has its own rate limits — typically 40 requests per minute per API key. When a client (OpenCode, Codex, n8n, or anything that speaks the OpenAI API) hits that limit, the upstream returns a 429 and most clients simply abort the task. open-proxy sits in between and makes the limit invisible:
+    23→    23→    23→
+    24→    24→    24→```
+    25→    25→    25→OpenCode ─┐
+    26→    26→    26→Codex     ├──► open-proxy ──┬─► integrate.api.nvidia.com   (NIM free tier)
+    27→    27→    27→n8n       ┘    │             ├─► openrouter.ai/api/v1       (OpenRouter)
+    28→    28→    28→               │             ├─► api.tokenrouter.com         (TokenRouter)
+    29→    29→    29→               │             └─► api.openai.com/v1           (OpenAI)
+    30→    30→    30→               │
+    31→    31→    31→               ├─ paces requests per key (sliding window, respects each upstream's limit)
+    32→    32→    32→               ├─ load-balances across all your keys and providers
+    33→    33→    33→               ├─ pins each conversation to one key (prefix-cache affinity)
+    34→    34→    34→               ├─ rides out 429/5xx with retries + Retry-After
+    35→    35→    35→               ├─ adapts to per-model worker-concurrency ceilings
+    36→    36→    36→               ├─ keeps client connections alive with SSE heartbeats
+    37→    37→    37→               ├─ answers /v1/models from cache (catalog polls cost nothing)
+    38→    38→    38→               └─ dashboard + Prometheus metrics for everything above
+    39→    39→    39→```
+    40→    40→    40→
+    41→    41→    41→The more keys you add, the higher your combined throughput: 3 NIM keys (120 RPM) + 5 OpenRouter keys (200 RPM) = **320 RPM** total, automatically distributed. Each key holds to its own upstream's limit; the proxy just makes agents patient enough to live within the budget. Load-tested to prove it: 100 concurrent clients, zero upstream rate violations.
+    42→    42→    42→
+    43→    43→    43→## Quick start
+    44→    44→    44→
+    45→    45→    45→**1. Get API keys.** Sign up with any supported provider and grab an API key:
+    46→    46→    46→
+    47→    47→    47→| Provider | Sign up | Key format | Free tier |
+    48→    48→    48→|---|---|---|---|
+    49→    49→    49→| **NVIDIA NIM** | [build.nvidia.com](https://build.nvidia.com) | `nvapi-…` | Yes — 40 RPM/key |
+    50→    50→    50→| **OpenRouter** | [openrouter.ai](https://openrouter.ai) | `sk-or-…` | Credit-based |
+    51→    51→    51→| **TokenRouter** | [tokenrouter.com](https://tokenrouter.com) | varies | Yes |
+    52→    52→    52→| **OpenAI** | [platform.openai.com](https://platform.openai.com) | `sk-…` | Pay-as-you-go |
+    53→    53→    53→| **Self-hosted** | your server | varies | Any OpenAI-compatible API |
+    54→    54→    54→
+    55→    55→    55→You'll paste keys into the setup wizard — never into a file. Add as many providers and keys as you like; they all merge into one pool.
+    56→    56→    56→
+    57→    57→    57→**2. Run the proxy.** The image is multi-arch, ~5 MB, with hardened defaults and persistent history:
+    58→    58→    58→
+    59→    59→    59→```sh
+    60→    60→    60→docker build -t open-proxy .
+    61→    61→    61→docker run -d --name open-proxy -p 127.0.0.1:8000:8000 -v open-proxy-data:/data \
+    62→    62→    62→  open-proxy
+    63→    63→    63→```
+    64→    64→    64→
+    65→    65→    65→With a checkout you can also use compose (`docker compose up -d --build`), or skip Docker entirely (`cargo run --release`). The `.env` file is optional and holds only container-level vars — see [Configuration](#configuration).
+    66→    66→    66→
+    67→    67→    67→```
+    68→    68→    68→   ___  ___ ___ _  _   ___ ___  _____  ____   __
+    69→    69→    69→  / _ \| _ \ __| \| | | _ \ _ \/ _ \ \/ /\ \ / /
+    70→    70→    70→ | (_) |  _/ _|| .` | |  _/   / (_) >  <  \ V /
+    71→    71→    71→  \___/|_| |___|_|\_| |_| |_|_\\___/_/\_\  |_|
+    72→    72→    72→```
+    73→    73→    73→
+    74→    74→    74→**3. Claim it.** Open `http://localhost:8000/` — a fresh install runs the **first-run wizard**: create the superuser account, add at least one API key (validated live against the upstream), and finish. By default the wizard also mints your first **client API key** (`npk_…`) and ends on a connect panel with the base URL and key ready to copy — so your client works immediately.
+    75→    75→    75→
+    76→    76→    76→<div align="center"><img src="docs/assets/setup-wizard.png" alt="First-run setup wizard" width="460"></div>
+    77→    77→    77→
+    78→    78→    78→> **The first visitor to a fresh install becomes the superuser** — finish the wizard as soon as the proxy is reachable (the boot log says so too). Until setup completes, `/v1` is closed (503) and browsers are sent to `/setup`.
+    79→    79→    79→
+    80→    80→    80→**4. Point your client at it.** Base URL `http://localhost:8000/v1`, API key = the `npk_…` key from the wizard. Recipes below.
+    81→    81→    81→
+    82→    82→    82→## Client recipes
+    83→    83→    83→
+    84→    84→    84→Model IDs pass through verbatim — use any model ID your provider supports (or `curl localhost:8000/v1/models` to see the merged catalog). In **API key required** mode (stored as `keyed`, the default), clients authenticate with a client API key (`npk_…`) minted in the wizard or in Settings. In **Open (no authentication)** mode (stored as `open`), no client key is needed.
+    85→    85→    85→
+    86→    86→    86→**OpenCode** — `opencode.json`:
+    87→    87→    87→
+    88→    88→    88→```json
+    89→    89→    89→{
+    90→    90→    90→  "$schema": "https://opencode.ai/config.json",
+    91→    91→    91→  "provider": {
+    92→    92→    92→    "nim": {
+    93→    93→    93→      "npm": "@ai-sdk/openai-compatible",
+    94→    94→    94→      "name": "OpenProxy (proxied)",
+    95→    95→    95→      "options": {
+    96→    96→    96→        "baseURL": "http://localhost:8000/v1",
+    97→    97→    97→        "apiKey": "npk_your-key-here",
+    98→    98→    98→        "timeout": false
+    99→    99→    99→      },
+   100→   100→   100→      "models": {
+   101→   101→   101→        "moonshotai/kimi-k2-instruct": { "name": "Kimi K2 Instruct" },
+   102→   102→   102→        "deepseek-ai/deepseek-r1": { "name": "DeepSeek R1" }
+   103→   103→   103→      }
+   104→   104→   104→    }
+   105→   105→   105→  }
+   106→   106→   106→}
+   107→   107→   107→```
+   108→   108→   108→
+   109→   109→   109→Set `options.timeout: false` so OpenCode waits through the proxy's rate-limit heartbeats instead of aborting. For a complete config tuned for **GLM-5.2** (context, compaction, sampling), copy [`examples/opencode.json`](examples/opencode.json) — see [`examples/README.md`](examples/README.md) for the rationale behind each setting.
+   110→   110→   110→
+   111→   111→   111→**Codex CLI** — `~/.codex/config.toml`:
+   112→   112→   112→
+   113→   113→   113→```toml
+   114→   114→   114→model_provider = "nim"
+   115→   115→   115→model = "moonshotai/kimi-k2-instruct"
+   116→   116→   116→
+   117→   117→   117→[model_providers.nim]
+   118→   118→   118→name = "OpenProxy (proxied)"
+   119→   119→   119→base_url = "http://localhost:8000/v1"
+   120→   120→   120→env_key = "OPENPROXY_API_KEY"   # export OPENPROXY_API_KEY=npk_your-key-here
+   121→   121→   121→wire_api = "chat"
+   122→   122→   122→```
+   123→   123→   123→
+   124→   124→   124→**n8n** — add an *OpenAI* credential with Base URL `http://localhost:8000/v1` and your `npk_…` key, then use it in AI nodes with a model ID from your provider.
+   125→   125→   125→
+   126→   126→   126→**Plain curl**:
+   127→   127→   127→
+   128→   128→   128→```sh
+   129→   129→   129→curl http://localhost:8000/v1/chat/completions \
+   130→   130→   130→  -H 'Content-Type: application/json' \
+   131→   131→   131→  -H 'Authorization: Bearer npk_your-key-here' \
+   132→   132→   132→  -d '{"model":"deepseek-ai/deepseek-r1","stream":true,
+   133→   133→   133→       "messages":[{"role":"user","content":"hello"}]}'
+   134→   134→   134→```
+   135→   135→   135→
+   136→   136→   136→For benchmarks or bounded jobs, add
+   137→   137→   137→`X-Nim-Proxy-Deadline-Ms: <milliseconds>`. This is an absolute wall-clock
+   138→   138→   138→deadline across proxy queueing, retries, and generation; heartbeats and output
+   139→   139→   139→chunks do not reset it. Buffered requests expire with HTTP 504 and error code
+   140→   140→   140→`deadline_exceeded`. Streaming requests have already committed HTTP 200, so
+   141→   141→   141→they receive the same code in a terminal SSE error event. Requests without the
+   142→   142→   142→header retain the proxy's normal patient behavior.
+   143→   143→   143→
+   144→   144→   144→## The dashboard
+   145→   145→   145→
+   146→   146→   146→Served at `GET /` — a compile-time embedded page with same-origin CSS,
+   147→   147→   147→JavaScript, and catalogs, but no Grafana or frontend build. Because the proxy
+   148→   148→   148→sits in the request path for every client and model,
+   149→   149→   149→it doubles as a **benchmarking and agent-observability tool**: it sees how
+   150→   150→   150→tool-heavy each client is, how deep its conversations run, how it tunes
+   151→   151→   151→sampling, where models truncate, and how much "thinking" a reasoning model
+   152→   152→   152→burns — all from counts and sizes, never message content.
+   153→   153→   153→
+   154→   154→   154→<div align="center"><img src="docs/assets/dashboard-models.png" alt="Models tab" width="850"></div>
+   155→   155→   155→
+   156→   156→   156→Five persona-aligned tabs, each ordered at-a-glance → trends → detail:
+   157→   157→   157→
+   158→   158→   158→- **Overview** — the one-screen landing: capacity and success-rate ring gauges, request and token sparklines, a health strip, and top models & clients.
+   159→   159→   159→- **Models** — ranked model cards, TTFT / generation-speed / inter-token-latency / upstream-latency charts, tokens-per-minute, tool-call volume, truncation and reasoning-share breakdowns, and a head-to-head scorecard.
+   160→   160→   160→- **Clients** — what each agent is *doing*: tool intensity, conversation depth, sampling fingerprint, requested output budget, streaming-vs-buffered mix, and a per-client leaderboard.
+   161→   161→   161→- **Reliability** — availability against the configured SLO (99.9% by default) with an error budget, requests-by-outcome over time, a latency breakdown (queue / first token / generation), an error taxonomy, an hour-of-day heatmap, and a model-limits card when the governor engages.
+   162→   162→   162→- **Capacity** — a **Now** saturation bar, historical utilization against the capacity configured at each sample, an exact peak-RPM shortfall, per-key utilization meters, and 429s-per-minute by key.
+   163→   163→   163→
+   164→   164→   164→<div align="center"><img src="docs/assets/dashboard-reliability.png" alt="Reliability tab" width="850"></div>
+   165→   165→   165→
+   166→   166→   166→Every line chart has a hover crosshair with a per-series tooltip; every table is click-to-sort and survives the 3-second live refresh.
+   167→   167→   167→
+   168→   168→   168→**Time ranges & history.** Persisted server history drives every analytical
+   169→   169→   169→tab. The default view follows now across the configured default time range
+   170→   170→   170→(30 days by default), so a new server grows naturally from its first sample
+   171→   171→   171→instead of opening on an empty recent slice. The same global selection follows
+   172→   172→   172→you through Overview, Models, Clients, Reliability, and Capacity. Presets
+   173→   173→   173→include 1h/6h/24h/7d/30d and **All time**; a custom range or the pause
+   174→   174→   174→control freezes the analytical time range while current operational values marked
+   175→   175→   175→**Now** keep refreshing. Exact totals do not depend on chart point density.
+   176→   176→   176→
+   177→   177→   177→The default time range and data retention are separate Server settings. Both
+   178→   178→   178→default to 30 days; retention may be longer than the default view, and `0`
+   179→   179→   179→means unlimited. A finite retention window cannot be shorter than the default
+   180→   180→   180→view. Real history size depends on metric and label cardinality—the old
+   181→   181→   181→fixed-size estimate was wrong—so monitor the displayed history-file size for
+   182→   182→   182→your workload.
+   183→   183→   183→
+   184→   184→   184→**Settings.** Everything app-level is managed here: endpoint groups (each an
+   185→   185→   185→OpenAI-compatible API with its own keys and rate limits), upstream API keys (per-key
+   186→   186→   186→rpm, enable/disable, group assignment), model routing (per-group allowlists
+   187→   187→   187→plus global model toggles), client API keys, the API authentication mode,
+   188→   188→   188→upstream URL, limits, default time range, history retention, availability
+   189→   189→   189→SLO, model limits, and users. Saves validate, persist, and apply
+   190→   190→   190→live. The config file itself is read at boot; an out-of-band edit to
+   191→   191→   191→`DATA_DIR/config.json` requires a restart.
+   192→   192→   192→
+   193→   193→   193→<div align="center"><img src="docs/assets/dashboard-settings.png" alt="Settings: Access & keys" width="850"></div>
+   194→   194→   194→
+   195→   195→   195→## How it works
+   196→   196→   196→
+   197→   197→   197→- **One rate window per key.** Each API key gets an exact sliding-window limiter (configurable per key, defaulting to 40 requests per rolling 60 s — matching common upstream limits, not a burstable token bucket — plus a 1 s jitter margin so boundary-timed requests can't land inside the upstream's window).
+   198→   198→   198→- **One queue for all clients.** Any number of clients share the key pool through a global FIFO dispatcher: slots are granted strictly in arrival order, no client can starve another, and a client that disconnects while queued returns its slot.
+   199→   199→   199→- **Sticky conversations, spread bursts.** Each conversation prefers the same key every turn, keeping any server-side prefix cache warm. When that key is full the request spills to the least-loaded ready key — the API is stateless, so crossing keys is always safe, just potentially a cold cache.
+   200→   200→   200→- **Heartbeats instead of failures.** For streaming requests the proxy commits to `200 text/event-stream` immediately and emits SSE comment lines (`: heartbeat` — ignored by every OpenAI client) while it waits for a slot or rides out upstream 429/500/502/503/504 with `Retry-After` honored and instant failover between keys. Streams that stall mid-generation are cut after the `stream_idle` limit.
+   201→   201→   201→- **Optional absolute deadlines.** `X-Nim-Proxy-Deadline-Ms` bounds the whole request independently of heartbeats or socket activity. Expiry cancels queue/retry/upstream work and releases its key, model, and in-flight ownership.
+   202→   202→   202→- **Model-pressure aware.** Some providers cap per-model worker concurrency independently of the per-key rate limit; the proxy detects that specific exhaustion, backs off the affected *model* adaptively (never wasting healthy key capacity on failover), and surfaces it on the dashboard — see [architecture: governor](knowledge/architecture/governor.md).
+   203→   203→   203→- **Pass-through with one exception.** Bodies are forwarded untouched, except: streaming chat requests get `stream_options: {"include_usage": true}` injected so token accounting is exact rather than estimated. If a model rejects the field, the proxy retries untouched and never injects for that model again. `strict_passthrough` in Settings disables injection entirely.
+   204→   204→   204→- **Local answers where possible.** `GET /v1/models` is cached (10 min default, single-flight refresh), so client catalog polls don't burn rate budget. With several endpoint groups the catalog fans out (one slot per group that has a key) and merges by model id, minus globally disabled models.
+   205→   205→   205→
+   206→   206→   206→## Configuration
+   207→   207→   207→
+   208→   208→   208→App-level configuration lives in the dashboard (Settings) and persists to
+   209→   209→   209→`DATA_DIR/config.json`. Settings saves apply live; the file is otherwise read
+   210→   210→   210→at boot, so manual or automated out-of-band edits require a restart.
+   211→   211→   211→Environment variables cover container-level concerns only:
+   212→   212→   212→
+   213→   213→   213→| Variable | Default | Purpose |
+   214→   214→   214→|---|---|---|
+   215→   215→   215→| `HOST` / `PORT` | `0.0.0.0` / `8000` | Bind address and port |
+   216→   216→   216→| `DATA_DIR` | `data` (`/data` in Docker) | Where the config store and canonical `history-v1.jsonl` live; must be writable (an unwritable dir is a hard boot error) |
+   217→   217→   217→| `TRUST_PROXY` | `false` | Trust `X-Forwarded-Proto` and mark the session cookie `Secure` (set behind a TLS-terminating reverse proxy) |
+   218→   218→   218→| `RUST_LOG` | `nim_proxy=info` | Log filter |
+   219→   219→   219→
+   220→   220→   220→Docker Compose also reads `PUBLISH_HOST` from `.env` for the host-side port
+   221→   221→   221→publish. It defaults to `127.0.0.1`; set `PUBLISH_HOST=0.0.0.0` only when the
+   222→   222→   222→deployment is ready for LAN/public reachability. This is a Compose setting,
+   223→   223→   223→not an environment variable consumed by the proxy.
+   224→   224→   224→
+   225→   225→   225→Everything else is a Settings control: endpoint groups (each an
+   226→   226→   226→OpenAI-compatible API with its own base URL, keys, enable toggle, and model
+   227→   227→   227→allowlist), upstream API keys (per-key rpm,
+   228→   228→   228→enable/disable, ownership, group assignment), model toggles (globally
+   229→   229→   229→disabled models are hidden from the merged `/v1/models` catalog and rejected
+   230→   230→   230→with `model_disabled` before queueing), the upstream base URL (the primary
+   231→   231→   231→group's), client API keys and the API authentication
+   232→   232→   232→mode (`keyed`/`open` in stored config), limits (`max_wait`, `heartbeat`,
+   233→   233→   233→`stream_idle`, `request_timeout`, `models_ttl`, `max_inflight`,
+   234→   234→   234→`strict_passthrough`), default time range, history retention, availability SLO,
+   235→   235→   235→model limits, and users & roles.
+   236→   236→   236→
+   237→   237→   237→Requests route by model name: a model pinned in a group's allowlist is served
+   238→   238→   238→only by that group; any other model falls back to the groups with an empty
+   239→   239→   239→allowlist (catch-alls). A model no enabled group carries is a `404
+   240→   240→   240→model_not_found`, not a wait-until-timeout.
+   241→   241→   241→
+   242→   242→   242→## Security & deployment
+   243→   243→   243→
+   244→   244→   244→The proxy **fails closed**. Before setup, the data plane is closed (`/v1` → `503 setup_required`) and browsers are sent to the wizard. After setup, the dashboard and all observability **always** require a logged-in user; `/v1` is either **API key required** (`keyed`) or **Open (no authentication)** (`open`). Credentials live in the config store on the data volume (`config.json`, mode 0600) — not in env vars.
+   245→   245→   245→
+   246→   246→   246→### Users & roles
+   247→   247→   247→
+   248→   248→   248→The wizard creates the **superuser** — an admin that can never be deleted (so the last admin can't vanish). From Settings → Users, admins add more users:
+   249→   249→   249→
+   250→   250→   250→- **superuser** — an admin; the one account that can't be deleted, and it always owns ≥1 enabled API key (the pool floor).
+   251→   251→   251→- **admin** — server settings + user management.
+   252→   252→   252→- **user** — own account, own client API keys, own upstream API keys. Sees every dashboard tab (identical for all roles) but only their own key rows.
+   253→   253→   253→
+   254→   254→   254→That last role is the shared-pool model: a friend adds their API key to the pool and mints their own client key; nobody else — not even an admin — can ever see either value.
+   255→   255→   255→
+   256→   256→   256→Login is username + password → a signed, HttpOnly, SameSite=Strict session cookie. Changing or resetting a password logs that user's other sessions out instantly; deleting a user kills their sessions, pulls their API keys from the pool, and revokes their client keys. Passwords are PBKDF2-HMAC-SHA256 (600k iterations). Forgot a password? Any admin resets it (except the superuser's — that one only rotates via its own Account page). Locked out entirely? Stop the container, empty the `"users"` array in `config.json` on the volume, restart — the wizard re-creates the superuser and keys/settings survive.
+   257→   257→   257→
+   258→   258→   258→### `/v1` API authentication
+   259→   259→   259→
+   260→   260→   260→- **API key required** (`keyed`, default) — clients send `Authorization: Bearer <npk_…>`. Each user mints their own client keys; a key's 128-bit secret is shown **exactly once** (only its SHA-256 digest + last-4 are stored). This mode with zero client keys rejects everything (fail closed). Unknown keys get an OpenAI-style 401; comparison is constant-time.
+   261→   261→   261→- **Open (no authentication)** (`open`) — `/v1` is unauthenticated. Only for loopback or a fully private network. This toggle affects **only `/v1`** — the dashboard is never open.
+   262→   262→   262→
+   263→   263→   263→The compose file publishes `127.0.0.1:8000:8000` by default so a bare
+   264→   264→   264→bring-up can't leak. Set `PUBLISH_HOST=0.0.0.0` in `.env` when intentional
+   265→   265→   265→LAN/public exposure is protected appropriately.
+   266→   266→   266→
+   267→   267→   267→### Scrapers
+   268→   268→   268→
+   269→   269→   269→Prometheus scrapes `/metrics` with `Authorization: Bearer <username>:<password>` (or HTTP Basic) for any dashboard user:
+   270→   270→   270→
+   271→   271→   271→```yaml
+   272→   272→   272→scrape_configs:
+   273→   273→   273→  - job_name: open-proxy
+   274→   274→   274→    authorization: { credentials: "<username>:<password>" }
+   275→   275→   275→    static_configs: [{ targets: ["open-proxy:8000"] }]
+   276→   276→   276→```
+   277→   277→   277→
+   278→   278→   278→`/health` stays public (load-balancer / Docker probe; exposes nothing).
+   279→   279→   279→
+   280→   280→   280→### The dashboard API
+   281→   281→   281→
+   282→   282→   282→The routes the dashboard and the setup wizard call are described by
+   283→   283→   283→[`openapi.json`](openapi.json) at the repo root — 17 operations covering 15
+   284→   284→   284→`/api/*` routes plus the two unauthenticated `/setup` ones. The public
+   285→   285→   285→`GET /api/locale-bootstrap` operation and both setup operations explicitly
+   286→   286→   286→waive the document-level authentication requirement; the other 14 `/api/*`
+   287→   287→   287→operations require operator authentication. The spec is
+   288→   288→   288→**generated from the handlers** (`utoipa`) and CI fails on any drift, so it
+   289→   289→   289→cannot describe a version of the API that no longer exists. Point any offline
+   290→   290→   290→viewer or client generator at it; nothing is served at runtime, which keeps
+   291→   291→   291→the Content-Security-Policy strict and the image a single static binary.
+   292→   292→   292→
+   293→   293→   293→The OpenAI-compatible `/v1` surface is deliberately not in there — that
+   294→   294→   294→contract is your upstream provider's, and open-proxy passes it through.
+   295→   295→   295→
+   296→   296→   296→### Deployment patterns
+   297→   297→   297→
+   298→   298→   298→| Pattern | How |
+   299→   299→   299→|---|---|
+   300→   300→   300→| **Local self-host** | Keep the default loopback port publish; switch to **Open (no authentication)** in Settings if you don't want client keys. |
+   301→   301→   301→| **VPS / bare metal** | A TLS-terminating reverse proxy (nginx/Caddy) in front; keep **API key required**. Set `TRUST_PROXY=true` so the session cookie is marked `Secure`. |
+   302→   302→   302→| **PaaS (ECS / Railway / Fly)** | The platform edge terminates TLS. Set `TRUST_PROXY=true`. Complete the wizard as soon as the instance is reachable. |
+   303→   303→   303→
+   304→   304→   304→**TLS is not built in** — passwords and keys must travel over HTTPS, so terminate TLS at a reverse proxy or platform edge for any exposed deployment. Additional hardening in place: a strict `Content-Security-Policy` and anti-framing/sniffing headers on all responses, a failed-login throttle, and an in-flight cap (`max_inflight`) that sheds floods with a 503.
+   305→   305→   305→
+   306→   306→   306→### Supply chain
+   307→   307→   307→
+   308→   308→   308→The build and release path is hardened to the OpenSSF baseline (scored weekly by the [Scorecard badge](https://scorecard.dev/viewer/?uri=github.com/miztertea/nim-proxy) above): every GitHub Actions step is SHA-pinned, CI runs **CodeQL** static analysis, workflow linting (`actionlint` + `zizmor`), dependency review, and `cargo-deny` (advisories on every PR plus a weekly audit), and the untrusted-byte parsers are **fuzzed** weekly. Releases are signed with keyless [cosign](https://docs.sigstore.dev/): the multi-arch image carries a signature, SLSA build provenance, and an SPDX SBOM, and the downloadable tarballs + SBOM each ship a `.sigstore.json` bundle you can check with `cosign verify-blob` (the exact command is in every release's notes). Published `v*` tags are protected against retagging.
+   309→   309→   309→
+   310→   310→   310→## Operations
+   311→   311→   311→
+   312→   312→   312→- **Image**: built `FROM scratch` — a ~5 MB static musl binary with TLS roots compiled in. No shell, no libc, no CA bundle. Runs as a non-root UID with `read_only`, `cap_drop: ALL`, `no-new-privileges`; rootless Docker/Podman compatible.
+   313→   313→   313→- **Healthcheck**: the binary doubles as its own probe (`open-proxy --health`); `docker ps` shows `healthy`.
+   314→   314→   314→- **Logs**: the ASCII banner + structured startup detail, then one access line per request (`200 alice model /v1/chat/completions (3210 ms)`). ANSI color is TTY-detected, so `docker logs` stays clean.
+   315→   315→   315→- **Metrics**: Prometheus exposition at `GET /metrics` (scrapeable by any OTel collector's Prometheus receiver). Full series list below.
+   316→   316→   316→- **Shutdown**: SIGTERM and SIGINT both drain gracefully.
+   317→   317→   317→
+   318→   318→   318→<details>
+   319→   319→   319→<summary><b>Full metric reference</b> (click to expand)</summary>
+   320→   320→   320→
+   321→   321→   321→| Metric | Labels | Meaning |
+   322→   322→   322→|---|---|---|
+   323→   323→   323→| `nimproxy_requests_total` | client, model, path, status | Every request (`status` includes `disconnect`, `stall`, `stream_error`, `deadline`) |
+   324→   324→   324→| `nimproxy_deadline_exceeded_total` | client, model, path | Requests stopped by `X-Nim-Proxy-Deadline-Ms` |
+   325→   325→   325→| `nimproxy_prompt_tokens_total` | client, model | Prompt tokens, from upstream `usage` |
+   326→   326→   326→| `nimproxy_completion_tokens_total` | client, model, source | Completion tokens; `usage` = exact, `estimate` = per-SSE-event fallback |
+   327→   327→   327→| `nimproxy_ttft_seconds` | model | Upstream send → first streamed byte |
+   328→   328→   328→| `nimproxy_tokens_per_second` | model, source | Generation speed |
+   329→   329→   329→| `nimproxy_tpot_seconds` | model | Mean inter-token latency (time per output token) |
+   330→   330→   330→| `nimproxy_upstream_seconds` | model | Upstream latency (streaming + non-streaming) |
+   331→   331→   331→| `nimproxy_finish_reason_total` | model, reason | How generations end; `length` = truncation |
+   332→   332→   332→| `nimproxy_tool_calls_total` | model | Tool calls emitted |
+   333→   333→   333→| `nimproxy_reasoning_tokens_total` | model | Reasoning ("thinking") tokens, from `usage` details |
+   334→   334→   334→| `nimproxy_usage_observations_total` | field, result | Usage-field quality: measured, estimated, unavailable, or invalid |
+   335→   335→   335→| `nimproxy_stream_requests_total` | client, stream | Requests per client, streaming vs buffered |
+   336→   336→   336→| `nimproxy_request_messages` | client | Conversation depth per request (histogram) |
+   337→   337→   337→| `nimproxy_request_tools` | client | Tools offered per request (histogram) |
+   338→   338→   338→| `nimproxy_request_max_tokens` | client | Requested output cap (histogram) |
+   339→   339→   339→| `nimproxy_request_temperature` | client | Sampling temperature (histogram) |
+   340→   340→   340→| `nimproxy_tool_choice_total` | mode | Tool-selection mode: `auto`/`none`/`required`/`named` |
+   341→   341→   341→| `nimproxy_json_mode_total` | client | Structured-output (JSON-mode) requests |
+   342→   342→   342→| `nimproxy_queue_wait_seconds` | — | Time waiting for a rate-limit slot |
+   343→   343→   343→| `nimproxy_queue_depth` / `nimproxy_active_requests` | — | Live load gauges |
+   344→   344→   344→| `nimproxy_lane_requests_total` | lane | Requests per key lane |
+   345→   345→   345→| `nimproxy_lane_cooldown_total` | lane, status | Upstream 429/5xx/connect per lane |
+   346→   346→   346→| `nimproxy_affinity_total` | result | Conversation routing: `sticky` / `spill` / `none` |
+   347→   347→   347→| `nimproxy_unauthorized_total` | — | Rejected API requests |
+   348→   348→   348→| `nimproxy_login_failures_total` | — | Failed dashboard logins |
+   349→   349→   349→| `nimproxy_shed_total` | — | Requests shed at the in-flight cap |
+   350→   350→   350→| `nimproxy_worker_exhausted_total` | model | Per-model worker-concurrency exhaustion events (when the upstream enforces it) |
+   351→   351→   351→| `nimproxy_model_inflight` | model | Requests in flight per model (governor gauge) |
+   352→   352→   352→| `nimproxy_model_limit` | model | Current per-model concurrency cap; `0` = ungoverned |
+   353→   353→   353→
+   354→   354→   354→Request shape (messages, tools, sampling params) is captured as **counts and sizes only — never message content**. The `model` and `path` labels are sanitized (safe charset, length-capped) and `model` cardinality is bounded; `reason`, `mode`, and `stream` are fixed enums — so untrusted clients can't inject into the exposition format or explode the registry.
+   355→   355→   355→
+   356→   356→   356→</details>
+   357→   357→   357→
+   358→   358→   358→## Testing
+   359→   359→   359→
+   360→   360→   360→Four layers (unit, end-to-end, load, fuzz), all runnable locally:
+   361→   361→   361→
+   362→   362→   362→```sh
+   363→   363→   363→cargo test          # unit + end-to-end tests (real binary vs a scripted mock upstream)
+   364→   364→   364→```
+   365→   365→   365→
+   366→   366→   366→The e2e suite covers auth (client keys, multi-user login, role and ownership enforcement, the fail-closed setup posture and the wizard), the config store (round-trip across restart, atomic saves, refusal on corrupt/future-version stores), 429 ride-out with key failover, per-model worker-exhaustion governing, Retry-After timing, pacing enforcement (including live pool rebuilds mid-run), conversation affinity, models caching, usage injection, stalled-stream recovery, label-injection sanitizing, security headers, metrics accuracy, history persistence across restart, and SIGTERM.
+   367→   367→   367→
+   368→   368→   368→Load test — 100 concurrent clients against a mock that *strictly enforces* the upstream's per-key window and counts violations (`--worker-slots` also emits per-model worker-exhaustion errors so the governor is exercised):
+   369→   369→   369→
+   370→   370→   370→```sh
+   371→   371→   371→python3 scripts/mock_nim.py --enforce --rpm 40 --worker-slots 32 --port 9999 &
+   372→   372→   372→cargo run --release &     # complete the wizard against http://127.0.0.1:9999
+   373→   373→   373→python3 scripts/loadtest.py --clients 100 --requests 3
+   374→   374→   374→```
+   375→   375→   375→
+   376→   376→   376→It exits non-zero on any client-visible failure or a single upstream rate violation, and reports worker exhaustions + peak per-model concurrency. See [`knowledge/testing/test-strategy.md`](knowledge/testing/test-strategy.md) for the full strategy and [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow.
+   377→   377→   377→
+   378→   378→   378→## Upgrading to 0.6.6
+   379→   379→   379→
+   380→   380→   380→Back up the data volume before upgrading; it contains `config.json`, API
+   381→   381→   381→keys, password hashes, and client API-key digests. Then pull and restart as
+   382→   382→   382→usual (`docker compose pull && docker compose up -d`, or replace the image in
+   383→   383→   383→your existing `docker run` deployment).
+   384→   384→   384→
+   385→   385→   385→0.6.6 intentionally starts dashboard history over in the canonical
+   386→   386→   386→`DATA_DIR/history-v1.jsonl` format. It does not read, rename, truncate, migrate,
+   387→   387→   387→or delete the experimental `DATA_DIR/history.jsonl`; the old file remains
+   388→   388→   388→available for rollback and may be removed manually after you no longer need
+   389→   389→   389→it. Historical charts begin with post-upgrade data.
+   390→   390→   390→
+   391→   391→   391→Also update dashboards, alerts, or recording rules from
+   392→   392→   392→`nimproxy_lane_benched_total` to `nimproxy_lane_cooldown_total`. Pricing
+   393→   393→   393→settings and estimated-savings fields are removed; an existing `pricing`
+   394→   394→   394→config block is ignored. The config store remains schema v1; the new server
+   395→   395→   395→locale defaults to `en-US`, and each user's optional locale defaults to no
+   396→   396→   396→override.
+   397→   397→   397→
+   398→   398→   398→The 0.6.6 interface ships in `en-US` only. Locale preference and server-default
+   399→   399→   399→API contracts are present for forward compatibility, but the only installed
+   400→   400→   400→production locale is `en-US`; the generated `en-XA` pseudolocale is test-only.
+
+[showing lines 1-400 of 434; use offset=401 with limit to continue reading]
