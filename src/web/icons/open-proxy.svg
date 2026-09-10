@@ -1,4 +1,22 @@
-<svg class="brand-mark" viewBox="0 0 34 34" width="34" height="34" aria-hidden="true" focusable="false">
-  <rect width="34" height="34" rx="9" fill="#0C1626"/>
-  <path d="M8 10h6l3 5 3-5h6v14h-5v-7l-4 6-4-6v7H8z" fill="#22d3ee"/>
+<svg class="brand-mark" viewBox="0 0 64 64" width="34" height="34" aria-hidden="true" focusable="false">
+  <rect width="64" height="64" rx="15" fill="#1C1D20"/>
+
+  <circle cx="15" cy="18" r="3.2" fill="#2DA86A"/>
+  <circle cx="15" cy="32" r="3.2" fill="#2DA86A"/>
+  <circle cx="15" cy="46" r="3.2" fill="#2DA86A"/>
+
+  <g fill="none" stroke-width="4" stroke-linecap="round" stroke="#38C27E">
+    <path d="M15 18Q28 18 37 32"/>
+    <path d="M15 32L37 32"/>
+    <path d="M15 46Q28 46 37 32"/>
+  </g>
+
+  <path
+    d="M37 32L48 32"
+    stroke="#6AD9A0"
+    stroke-width="6"
+    stroke-linecap="round"
+  />
+  <circle cx="48" cy="32" r="6.5" fill="#6AD9A026"/>
+  <circle cx="48" cy="32" r="4.5" fill="#7FE5B0"/>
 </svg>

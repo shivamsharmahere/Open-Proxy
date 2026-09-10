@@ -86,7 +86,7 @@ button:focus-visible { box-shadow: 0 0 0 3px var(--accent-glow); }
   background: linear-gradient(180deg, rgba(255,255,255,0.97) 0%, rgba(244,246,249,0.99) 100%);
 }
 .brand { display: flex; align-items: center; gap: 11px; padding: 2px 8px 22px; }
-.brand-mark { flex: none; display: block; border-radius: 9px; filter: drop-shadow(0 0 6px var(--accent-glow)); }
+.brand-mark { flex: none; display: block; border-radius: 15px; filter: drop-shadow(0 0 6px var(--accent-glow)); }
 .wordmark { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; line-height: 1; white-space: nowrap; }
 .wordmark b {
   background: linear-gradient(135deg, var(--accent) 0%, #6EE7B7 50%, var(--accent) 100%);
