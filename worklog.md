@@ -55,3 +55,25 @@ Verification:
 
 Stage Summary:
 - DONE. Hero + routing diagram significantly upgraded; files touched: hero.tsx, globals.css
+
+---
+Task ID: 3
+Agent: main (Super Z)
+Task: Fix 166 RPM combined overlap (move figure inside hub, small) + add power-up effect when a CLI chip touches the emerald stream
+
+Work Log:
+- Removed the floating "166 rpm combined" glass badge from the desktop stage (it collided with orbit chips + rings crossing the ring's left point)
+- Hub redesigned into a throughput meter: enlarged to 4.7rem, now carries Terminal icon + counting 166 (Counter, 2.2s) + "rpm combined" label — exactly where the stream plugs in; hit-ring resized to match
+- ClientChip: added relative positioning + flashKey prop; power-up visuals = opx-charge surge (bright emerald flash, scale pop 1->1.16->1, glow bloom, settles to idle), expanding chip-burst-ring, zap-pop spark badge above chip, status dot burst
+- Contact sync rewritten: replaced wall-clock interval (drifted vs CSS rotation) with rAF loop reading the ring's live CSS animation clock via getAnimations() — flash now fires at the exact moment the chip center crosses the stream intake point (180°), immune to hydration delay; PASS_SEQ/PASS_MS replaced by computed CONTACT_CROSSINGS
+- globals.css: new keyframes opx-charge / opx-chip-burst / opx-zap-pop / opx-dot-burst; old persistent .chip-served state replaced by 0.95s forwards animation
+- Cleanup: removed unused InfinityIcon import and dead useOdometer hook
+- Verified via agent-browser wait --fn on .zap-pop presence: desktop 1440 shot catches n8n exactly ON the strip mid-power-up; mobile 390 catches Hermes charged with zap spark; hub 166 renders clean on both
+
+Verification:
+- bun run lint: clean
+- Console: no page errors (only Fast Refresh logs)
+- Screenshots kept: download/verify-contact-1.png, download/verify-contact-2.png
+
+Stage Summary:
+- DONE. Overlap eliminated (166 lives inside the hub now); strip-contact power-up effect shipped and animation-clock synced. Files touched: hero.tsx, globals.css

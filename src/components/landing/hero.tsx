@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -19,7 +19,6 @@ import {
   Plus,
   Copy,
   Check,
-  Infinity as InfinityIcon,
 } from "lucide-react";
 import { LogoMark } from "./logo";
 import { Counter } from "./reveal";
@@ -109,19 +108,6 @@ function useLiveStats() {
     };
   }, []);
   return { reqs, blocked };
-}
-
-/* always-climbing requests odometer for the hero */
-function useOdometer(start: number) {
-  const [n, setN] = useState(start);
-  useEffect(() => {
-    const t = setInterval(
-      () => setN((v) => v + 2 + Math.floor(Math.random() * 8)),
-      650
-    );
-    return () => clearInterval(t);
-  }, []);
-  return n;
 }
 
 function useEventTicker() {
@@ -309,15 +295,17 @@ function ClientChip({
   name,
   compact,
   flash,
+  flashKey,
 }: {
   name: string;
   compact?: boolean;
   flash?: "served" | "retry" | null;
+  flashKey?: number;
 }) {
   return (
     <div
       className={cn(
-        "diffuse-card chip-flash flex items-center gap-1.5 whitespace-nowrap rounded-full border border-emerald-600/15 bg-white px-3 py-1.5",
+        "diffuse-card chip-flash relative flex items-center gap-1.5 whitespace-nowrap rounded-full border border-emerald-600/15 bg-white px-3 py-1.5",
         compact ? "text-[10px]" : "text-[11.5px]",
         flash === "served" && "chip-served",
         flash === "retry" && "chip-retry chip-shake"
@@ -326,18 +314,43 @@ function ClientChip({
       <span
         className={cn(
           "h-1 w-1 rounded-full transition-colors",
-          flash === "retry" ? "bg-amber-500" : "bg-emerald-500/70"
+          flash === "retry" ? "bg-amber-500" : "bg-emerald-500/70",
+          flash === "served" && "chip-dot-burst"
         )}
       />
       <span className="font-mono font-medium text-stone-700">{name}</span>
+
+      {/* power-up burst — fires the moment this chip touches the stream */}
+      {flash === "served" ? (
+        <>
+          <span
+            key={`ring-${flashKey}`}
+            aria-hidden
+            className="chip-burst-ring absolute inset-0 rounded-full border-2 border-emerald-400/70"
+          />
+          <span
+            key={`zap-${flashKey}`}
+            aria-hidden
+            className="zap-pop absolute -right-1 -top-2.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_4px_12px_-2px_oklch(0.6_0.14_155/0.65)]"
+          >
+            <Zap className="h-2.5 w-2.5" strokeWidth={2.6} />
+          </span>
+        </>
+      ) : null}
     </div>
   );
 }
 
-/* chips are evenly spaced on the ring, so they cross the hub intake
-   point (left, 180°) in a fixed order — flash each one as it passes */
-const PASS_SEQ = [4, 3, 2, 1, 0, 5];
-const PASS_MS = 38000 / CLIENTS.length;
+/* the client ring rotates clockwise at 38s/turn, so each chip meets the
+   emerald stream intake (left, 180°) at a computable animation-time — we
+   read the live CSS animation clock and power up each chip exactly at
+   contact, immune to hydration/wall-clock drift */
+const SPIN_MS = 38000;
+const CONTACT_CROSSINGS = CLIENTS.map((_, i) => {
+  const theta = (i / CLIENTS.length) * 360 - 90; /* chip's angle on ring */
+  const phi = (((180 - theta) % 360) + 360) % 360; /* rotation at contact */
+  return { chip: i, at: (phi / 360) * SPIN_MS };
+}).sort((a, b) => a.at - b.at);
 
 function Orbit({ scale = 1 }: { scale?: number }) {
   const compact = scale < 1;
@@ -347,34 +360,49 @@ function Orbit({ scale = 1 }: { scale?: number }) {
     count: number;
   } | null>(null);
 
+  const ringRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     let idx = 0;
+    let cycle = 0;
     let count = 0;
-    let interval: ReturnType<typeof setInterval> | undefined;
+    let raf = 0;
     let retryT: ReturnType<typeof setTimeout> | undefined;
-    const fire = () => {
-      const i = PASS_SEQ[idx % PASS_SEQ.length];
-      idx += 1;
-      count += 1;
-      if (count % 4 === 0) {
-        /* every 4th pass: a 429 gets absorbed, retried, then smooth again */
-        setFlash({ i, mode: "retry", count });
-        retryT = setTimeout(
-          () => setFlash({ i, mode: "served", count: count + 0.5 }),
-          550
-        );
-      } else {
-        setFlash({ i, mode: "served", count });
+
+    /* align our clock with the ring's actual CSS animation time */
+    const anim = ringRef.current?.getAnimations?.()[0];
+    const animT =
+      anim && typeof anim.currentTime === "number" ? anim.currentTime : 0;
+    const t0 = performance.now() - animT;
+
+    const tick = (now: number) => {
+      const t = now - t0;
+      const target = CONTACT_CROSSINGS[idx].at + cycle * SPIN_MS;
+      if (t >= target) {
+        const i = CONTACT_CROSSINGS[idx].chip;
+        idx += 1;
+        if (idx >= CONTACT_CROSSINGS.length) {
+          idx = 0;
+          cycle += 1;
+        }
+        count += 1;
+        if (count % 4 === 0) {
+          /* every 4th contact: a 429 gets absorbed, retried, then powered */
+          setFlash({ i, mode: "retry", count });
+          retryT = setTimeout(
+            () => setFlash({ i, mode: "served", count: count + 0.5 }),
+            550
+          );
+        } else {
+          setFlash({ i, mode: "served", count });
+        }
       }
+      raf = requestAnimationFrame(tick);
     };
-    const first = setTimeout(() => {
-      fire();
-      interval = setInterval(fire, PASS_MS);
-    }, 3400);
+    raf = requestAnimationFrame(tick);
     return () => {
-      clearTimeout(first);
+      cancelAnimationFrame(raf);
       if (retryT) clearTimeout(retryT);
-      if (interval) clearInterval(interval);
     };
   }, []);
 
@@ -390,27 +418,40 @@ function Orbit({ scale = 1 }: { scale?: number }) {
       <div className="core-ring absolute inset-[17%]">
         <span className="absolute left-1/2 top-0 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_2px_oklch(0.7_0.14_155/0.45)]" />
       </div>
-      {/* hub — the stream plugs in here */}
+      {/* hub — the stream plugs in here, carrying the combined figure */}
       <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
         {flash ? (
           <span
             key={flash.count}
             aria-hidden
-            className="hit-ring absolute left-1/2 top-1/2 h-16 w-16 rounded-2xl border-2 border-emerald-400/60"
+            className="hit-ring absolute left-1/2 top-1/2 h-[4.7rem] w-[4.7rem] rounded-2xl border-2 border-emerald-400/60"
           />
         ) : null}
-        <div className="hub-pulse flex h-16 w-16 flex-col items-center justify-center rounded-2xl border border-emerald-600/25 bg-white shadow-[0_14px_28px_-12px_oklch(0.6_0.14_155/0.45)]">
+        <div className="hub-pulse flex h-[4.7rem] w-[4.7rem] flex-col items-center justify-center rounded-2xl border border-emerald-600/25 bg-white shadow-[0_14px_28px_-12px_oklch(0.6_0.14_155/0.45)]">
           <Terminal
-            className={cn("text-emerald-600", compact ? "h-4 w-4" : "h-5 w-5")}
+            className={cn("text-emerald-600", compact ? "h-3.5 w-3.5" : "h-4 w-4")}
             strokeWidth={1.7}
           />
-          <span className="mt-0.5 font-mono text-[7.5px] uppercase tracking-[0.2em] text-stone-400">
-            hub
+          <span
+            className={cn(
+              "tnum mt-0.5 font-mono font-bold leading-none text-emerald-700",
+              compact ? "text-[12px]" : "text-[15px]"
+            )}
+          >
+            <Counter to={166} duration={2.2} />
+          </span>
+          <span
+            className={cn(
+              "font-mono uppercase tracking-[0.13em] text-stone-400",
+              compact ? "text-[6px]" : "mt-[3px] text-[7px]"
+            )}
+          >
+            rpm combined
           </span>
         </div>
       </div>
       {/* revolving clients */}
-      <div className="orbit-ring absolute inset-0">
+      <div ref={ringRef} className="orbit-ring absolute inset-0">
         {CLIENTS.map((c, i) => {
           const angle = (i / CLIENTS.length) * Math.PI * 2 - Math.PI / 2;
           const left = `${50 + 50 * Math.cos(angle)}%`;
@@ -426,6 +467,7 @@ function Orbit({ scale = 1 }: { scale?: number }) {
                   name={c}
                   compact={compact}
                   flash={flash?.i === i ? flash.mode : null}
+                  flashKey={flash?.count}
                 />
               </div>
             </div>
@@ -712,31 +754,6 @@ function HeroDiagramDesktop() {
             transition={{ delay: 0.7, duration: 0.8, ease: EASE }}
           >
             <ProxyCore />
-          </motion.div>
-        </div>
-
-        {/* 166 RPM badge — rides the stream, snug against the hub */}
-        <div
-          className="absolute z-10 -translate-x-1/2 -translate-y-1/2"
-          style={{ left: "75.6%", top: "49.5%" }}
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.7 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 1.75, duration: 0.7, ease: EASE }}
-          >
-            <div className="glass rounded-2xl px-4 py-2 text-center">
-              <p className="tnum font-mono text-xl font-bold leading-none text-emerald-700">
-                <Counter to={166} duration={2.2} />
-              </p>
-              <p className="mt-1 font-mono text-[8.5px] uppercase tracking-[0.18em] text-stone-500">
-                rpm combined
-              </p>
-              <p className="mt-0.5 flex items-center justify-center gap-1 font-mono text-[8px] uppercase tracking-[0.14em] text-emerald-600">
-                <Plus className="h-2 w-2" strokeWidth={2.4} />
-                every key adds more
-              </p>
-            </div>
           </motion.div>
         </div>
 

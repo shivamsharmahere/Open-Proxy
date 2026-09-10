@@ -357,17 +357,65 @@
   animation: opx-hit 0.6s ease-out forwards;
 }
 
-/* client chip states — served / transient 429 retry */
+/* client chip states — power-up surge on stream contact / transient 429 retry */
 .chip-flash {
   transition: box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
 }
-.chip-served {
-  border-color: oklch(0.7 0.14 155 / 0.55) !important;
-  transform: scale(1.07);
-  box-shadow:
-    0 0 0 3px oklch(0.7 0.14 155 / 0.16),
-    0 10px 26px -10px oklch(0.6 0.14 155 / 0.55);
+
+/* charge surge: flash bright emerald, pop, then settle back to idle */
+@keyframes opx-charge {
+  0% {
+    background-color: oklch(0.955 0.05 155);
+    border-color: oklch(0.7 0.14 155 / 0.9);
+    transform: scale(1.16);
+    box-shadow:
+      0 0 0 4px oklch(0.7 0.14 155 / 0.2),
+      0 0 28px 4px oklch(0.7 0.14 155 / 0.45),
+      0 10px 26px -10px oklch(0.6 0.14 155 / 0.55);
+  }
+  45% {
+    transform: scale(1.06);
+  }
+  100% {
+    background-color: oklch(1 0 0);
+    border-color: oklch(0.596 0.145 163 / 0.15);
+    transform: scale(1);
+    box-shadow: 0 6px 16px -8px oklch(0.216 0.008 90 / 0.12);
+  }
 }
+.chip-served {
+  animation: opx-charge 0.95s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* expanding burst ring around the charged chip */
+@keyframes opx-chip-burst {
+  from { opacity: 0.9; transform: scale(1); }
+  to   { opacity: 0; transform: scale(1.7); }
+}
+.chip-burst-ring {
+  animation: opx-chip-burst 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* zap spark pops off the top of the chip */
+@keyframes opx-zap-pop {
+  0%   { opacity: 0; transform: translateY(4px) scale(0.3) rotate(-18deg); }
+  35%  { opacity: 1; transform: translateY(-3px) scale(1.22) rotate(6deg); }
+  70%  { opacity: 1; transform: translateY(-5px) scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: translateY(-9px) scale(0.82); }
+}
+.zap-pop {
+  animation: opx-zap-pop 0.95s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* status dot quick burst inside the chip */
+@keyframes opx-dot-burst {
+  0%   { box-shadow: 0 0 0 0 oklch(0.7 0.14 155 / 0.55); transform: scale(1.7); }
+  100% { box-shadow: 0 0 0 6px oklch(0.7 0.14 155 / 0); transform: scale(1); }
+}
+.chip-dot-burst {
+  animation: opx-dot-burst 0.8s ease-out forwards;
+}
+
 .chip-retry {
   border-color: oklch(0.8 0.16 85 / 0.6) !important;
   transform: scale(1.04);

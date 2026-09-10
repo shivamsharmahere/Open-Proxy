@@ -1,0 +1,1113 @@
+     1→     1→"use client";
+     2→     2→
+     3→     3→import { useEffect, useMemo, useState, type ReactNode } from "react";
+     4→     4→import { motion } from "framer-motion";
+     5→     5→import {
+     6→     6→  ArrowRight,
+     7→     7→  Github,
+     8→     8→  Terminal,
+     9→     9→  ArrowDown,
+    10→    10→  Blocks,
+    11→    11→  Gauge,
+    12→    12→  Route,
+    13→    13→  RefreshCw,
+    14→    14→  Zap,
+    15→    15→  Layers,
+    16→    16→  Timer,
+    17→    17→  ShieldCheck,
+    18→    18→  ShieldAlert,
+    19→    19→  Plus,
+    20→    20→  Copy,
+    21→    21→  Check,
+    22→    22→  Infinity as InfinityIcon,
+    23→    23→} from "lucide-react";
+    24→    24→import { LogoMark } from "./logo";
+    25→    25→import { Counter } from "./reveal";
+    26→    26→import { cn } from "@/lib/utils";
+    27→    27→
+    28→    28→const EASE = [0.16, 1, 0.3, 1] as const;
+    29→    29→
+    30→    30→/* ------------------------------------------------------------------ */
+    31→    31→/* data                                                                */
+    32→    32→/* ------------------------------------------------------------------ */
+    33→    33→
+    34→    34→const PROVIDERS = [
+    35→    35→  { name: "NVIDIA NIM", keys: "2× keys", rpm: 80, mono: "N", short: "NIM" },
+    36→    36→  { name: "OpenRouter", keys: "2× keys", rpm: 40, mono: "OR", short: "OpenRouter" },
+    37→    37→  { name: "TokenRouter", keys: "2× keys", rpm: 16, mono: "TR", short: "TokenRouter" },
+    38→    38→  { name: "Other providers", keys: "self-hosted", rpm: 50, mono: "+", short: "Others" },
+    39→    39→];
+    40→    40→
+    41→    41→const CLIENTS = ["OpenCode", "Hermes", "Claude Code", "Codex", "n8n", "Cline"];
+    42→    42→
+    43→    43→/* wire geometry in viewBox space (1200 × 440) — one per provider,
+    44→    44→   stroke width scales with the provider's rpm contribution          */
+    45→    45→const WIRES = [
+    46→    46→  "M 252 62 C 348 62, 372 148, 458 154",
+    47→    47→  "M 252 166 C 344 166, 370 192, 458 192",
+    48→    48→  "M 252 270 C 344 270, 370 244, 458 244",
+    49→    49→  "M 252 374 C 348 374, 372 288, 458 282",
+    50→    50→];
+    51→    51→
+    52→    52→/* the one thick stream — runs from the core all the way into the hub */
+    53→    53→const STREAM = "M 716 218 C 800 218, 890 218, 962 218";
+    54→    54→
+    55→    55→/* orbit geometry in viewBox space */
+    56→    56→const ORBIT_CX = 1000;
+    57→    57→const ORBIT_CY = 218;
+    58→    58→const ORBIT_R = 150;
+    59→    59→
+    60→    60→const STAGES = [
+    61→    61→  { n: "01", t: "upstream pools", left: "11%" },
+    62→    62→  { n: "02", t: "one endpoint", left: "47.9%" },
+    63→    63→  { n: "03", t: "pooled throughput", left: "69.9%" },
+    64→    64→  { n: "04", t: "every agent", left: "84.2%" },
+    65→    65→];
+    66→    66→
+    67→    67→const EVENTS = [
+    68→    68→  { text: "POST /v1/chat/completions → nim-1 · 200 OK · 41ms", tone: "ok" },
+    69→    69→  { text: "POST /v1/chat/completions → tokenrouter-1 · 200 OK · 55ms", tone: "ok" },
+    70→    70→  { text: "openrouter-2 · 429 absorbed · retry scheduled +1.2s", tone: "warn" },
+    71→    71→  { text: "POST /v1/chat/completions → nim-2 · 200 · streamed 1.2k tok", tone: "ok" },
+    72→    72→  { text: "failover: nim-1 → openrouter-1 · affinity kept", tone: "info" },
+    73→    73→  { text: "POST /v1/chat/completions → others-3 · 200 OK · 47ms", tone: "ok" },
+    74→    74→  { text: "pace: 166 rpm budget shared · 0 requests dropped", tone: "info" },
+    75→    75→] as const;
+    76→    76→
+    77→    77→const STATS = [
+    78→    78→  { icon: Zap, v: "166 RPM", l: "pooled throughput" },
+    79→    79→  { icon: Layers, v: "12 keys", l: "across 4 upstreams" },
+    80→    80→  { icon: Timer, v: "+1.8ms", l: "p95 pacing overhead" },
+    81→    81→  { icon: ShieldCheck, v: "MIT", l: "self-hosted · fail-closed" },
+    82→    82→];
+    83→    83→
+    84→    84→const TONE_DOT: Record<string, string> = {
+    85→    85→  ok: "bg-emerald-500",
+    86→    86→  warn: "bg-amber-500",
+    87→    87→  info: "bg-sky-500",
+    88→    88→};
+    89→    89→
+    90→    90→/* ------------------------------------------------------------------ */
+    91→    91→/* live state hooks (client-only intervals, deterministic first paint) */
+    92→    92→/* ------------------------------------------------------------------ */
+    93→    93→
+    94→    94→function useLiveStats() {
+    95→    95→  const [reqs, setReqs] = useState(12408);
+    96→    96→  const [blocked, setBlocked] = useState(331);
+    97→    97→  useEffect(() => {
+    98→    98→    const a = setInterval(
+    99→    99→      () => setReqs((r) => r + 1 + Math.floor(Math.random() * 6)),
+   100→   100→      700
+   101→   101→    );
+   102→   102→    const b = setInterval(
+   103→   103→      () => setBlocked((v) => v + (Math.random() < 0.6 ? 1 : 0)),
+   104→   104→      5200
+   105→   105→    );
+   106→   106→    return () => {
+   107→   107→      clearInterval(a);
+   108→   108→      clearInterval(b);
+   109→   109→    };
+   110→   110→  }, []);
+   111→   111→  return { reqs, blocked };
+   112→   112→}
+   113→   113→
+   114→   114→/* always-climbing requests odometer for the hero */
+   115→   115→function useOdometer(start: number) {
+   116→   116→  const [n, setN] = useState(start);
+   117→   117→  useEffect(() => {
+   118→   118→    const t = setInterval(
+   119→   119→      () => setN((v) => v + 2 + Math.floor(Math.random() * 8)),
+   120→   120→      650
+   121→   121→    );
+   122→   122→    return () => clearInterval(t);
+   123→   123→  }, []);
+   124→   124→  return n;
+   125→   125→}
+   126→   126→
+   127→   127→function useEventTicker() {
+   128→   128→  const [idx, setIdx] = useState(0);
+   129→   129→  useEffect(() => {
+   130→   130→    const t = setInterval(() => setIdx((i) => (i + 1) % EVENTS.length), 2600);
+   131→   131→    return () => clearInterval(t);
+   132→   132→  }, []);
+   133→   133→  return EVENTS[idx];
+   134→   134→}
+   135→   135→
+   136→   136→/* deterministic PRNG so SSR and client render the same sparkline */
+   137→   137→function seededPoints(): number[] {
+   138→   138→  let s = 7;
+   139→   139→  const rand = () => {
+   140→   140→    s = (s * 16807) % 2147483647;
+   141→   141→    return (s - 1) / 2147483646;
+   142→   142→  };
+   143→   143→  const pts: number[] = [];
+   144→   144→  let v = 146;
+   145→   145→  for (let i = 0; i < 44; i++) {
+   146→   146→    v += (rand() - 0.47) * 10;
+   147→   147→    v = Math.max(128, Math.min(172, v));
+   148→   148→    pts.push(v);
+   149→   149→  }
+   150→   150→  pts[12] = Math.max(pts[12], 166);
+   151→   151→  pts[31] = Math.max(pts[31], 169);
+   152→   152→  return pts;
+   153→   153→}
+   154→   154→
+   155→   155→function buildSpark(pts: number[]) {
+   156→   156→  const W = 300;
+   157→   157→  const H = 64;
+   158→   158→  const P = 5;
+   159→   159→  const min = Math.min(...pts);
+   160→   160→  const max = Math.max(...pts);
+   161→   161→  const span = max - min || 1;
+   162→   162→  const step = (W - 2 * P) / (pts.length - 1);
+   163→   163→  const xy = pts.map(
+   164→   164→    (v, i) => [P + i * step, P + (H - 2 * P) * (1 - (v - min) / span)] as const
+   165→   165→  );
+   166→   166→  let line = `M ${xy[0][0].toFixed(1)} ${xy[0][1].toFixed(1)}`;
+   167→   167→  for (let i = 0; i < xy.length - 1; i++) {
+   168→   168→    const p0 = xy[Math.max(0, i - 1)];
+   169→   169→    const p1 = xy[i];
+   170→   170→    const p2 = xy[i + 1];
+   171→   171→    const p3 = xy[Math.min(xy.length - 1, i + 2)];
+   172→   172→    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+   173→   173→    const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+   174→   174→    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+   175→   175→    const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+   176→   176→    line += ` C ${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+   177→   177→  }
+   178→   178→  const area = `${line} L ${xy[xy.length - 1][0].toFixed(1)} ${H} L ${xy[0][0].toFixed(1)} ${H} Z`;
+   179→   179→  const ceilingY = P + (H - 2 * P) * (1 - (166 - min) / span);
+   180→   180→  return { line, area, last: xy[xy.length - 1], ceilingY };
+   181→   181→}
+   182→   182→
+   183→   183→/* ------------------------------------------------------------------ */
+   184→   184→/* pieces                                                              */
+   185→   185→/* ------------------------------------------------------------------ */
+   186→   186→
+   187→   187→function ProviderCard({
+   188→   188→  p,
+   189→   189→  i,
+   190→   190→  compact,
+   191→   191→}: {
+   192→   192→  p: (typeof PROVIDERS)[number];
+   193→   193→  i: number;
+   194→   194→  compact?: boolean;
+   195→   195→}) {
+   196→   196→  const pct = Math.round((p.rpm / 80) * 100);
+   197→   197→  return (
+   198→   198→    <div
+   199→   199→      className={cn(
+   200→   200→        "diffuse-card float-y relative overflow-hidden rounded-2xl px-4 pb-4 pt-3",
+   201→   201→        compact && "px-3 pb-3.5 pt-2.5"
+   202→   202→      )}
+   203→   203→      style={{ animationDelay: `${i * 0.7}s` }}
+   204→   204→    >
+   205→   205→      <div className="flex items-center gap-3">
+   206→   206→        <div
+   207→   207→          className={cn(
+   208→   208→            "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-stone-900/10 bg-stone-50 font-mono text-[10px] font-semibold text-stone-600",
+   209→   209→            compact && "h-8 w-8 text-[9px]"
+   210→   210→          )}
+   211→   211→        >
+   212→   212→          {p.mono}
+   213→   213→        </div>
+   214→   214→        <div className="min-w-0 flex-1 leading-tight">
+   215→   215→          <p
+   216→   216→            className={cn(
+   217→   217→              "truncate text-[13px] font-semibold text-stone-800",
+   218→   218→              compact && "text-[11.5px]"
+   219→   219→            )}
+   220→   220→          >
+   221→   221→            {compact ? p.short : p.name}
+   222→   222→          </p>
+   223→   223→          <p className="font-mono text-[10px] uppercase tracking-wider text-stone-400">
+   224→   224→            {p.keys}
+   225→   225→          </p>
+   226→   226→        </div>
+   227→   227→        <div className="text-right leading-tight">
+   228→   228→          <p className="tnum font-mono text-[15px] font-semibold text-stone-900">
+   229→   229→            {p.rpm}
+   230→   230→          </p>
+   231→   231→          <p className="font-mono text-[9px] uppercase tracking-widest text-stone-400">
+   232→   232→            rpm
+   233→   233→          </p>
+   234→   234→        </div>
+   235→   235→      </div>
+   236→   236→      {/* rpm share bar */}
+   237→   237→      <div
+   238→   238→        className={cn(
+   239→   239→          "absolute inset-x-4 bottom-2 h-[3px] overflow-hidden rounded-full bg-stone-100",
+   240→   240→          compact && "inset-x-3 bottom-1.5"
+   241→   241→        )}
+   242→   242→      >
+   243→   243→        <motion.div
+   244→   244→          initial={{ width: 0 }}
+   245→   245→          animate={{ width: `${pct}%` }}
+   246→   246→          transition={{ delay: 0.45 + i * 0.13, duration: 1, ease: EASE }}
+   247→   247→          className="h-full rounded-full bg-gradient-to-r from-emerald-600/85 to-emerald-400"
+   248→   248→        />
+   249→   249→      </div>
+   250→   250→    </div>
+   251→   251→  );
+   252→   252→}
+   253→   253→
+   254→   254→function ProxyCore() {
+   255→   255→  const chips = [
+   256→   256→    { icon: Blocks, label: "Queue" },
+   257→   257→    { icon: Gauge, label: "Pace" },
+   258→   258→    { icon: Route, label: "Route" },
+   259→   259→    { icon: RefreshCw, label: "Retry" },
+   260→   260→  ];
+   261→   261→  return (
+   262→   262→    <div className="relative">
+   263→   263→      {/* slow-spinning dashed status ring */}
+   264→   264→      <div
+   265→   265→        aria-hidden
+   266→   266→        className="core-ring absolute -inset-3 rounded-[2rem] border border-dashed border-emerald-600/25"
+   267→   267→      />
+   268→   268→      <div
+   269→   269→        aria-hidden
+   270→   270→        className="absolute -inset-7 rounded-[2.6rem] bg-emerald-200/25 blur-2xl"
+   271→   271→      />
+   272→   272→      <div className="core-pulse diffuse-card relative flex w-[250px] flex-col gap-3 rounded-[1.6rem] px-5 py-4">
+   273→   273→        <div className="flex items-center justify-between gap-2">
+   274→   274→          <div className="flex items-center gap-2.5">
+   275→   275→            <LogoMark className="h-9 w-9" />
+   276→   276→            <div className="leading-tight">
+   277→   277→              <p className="text-[15px] font-semibold tracking-tight text-stone-900">
+   278→   278→                open-proxy
+   279→   279→              </p>
+   280→   280→              <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-emerald-600">
+   281→   281→                one endpoint
+   282→   282→              </p>
+   283→   283→            </div>
+   284→   284→          </div>
+   285→   285→          <span className="flex shrink-0 items-center gap-1.5 rounded-md border border-emerald-600/20 bg-emerald-50 px-1.5 py-1 font-mono text-[8.5px] font-semibold uppercase tracking-wider text-emerald-700">
+   286→   286→            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 heartbeat-dot" />
+   287→   287→            4/4 up
+   288→   288→          </span>
+   289→   289→        </div>
+   290→   290→        <div className="grid grid-cols-4 gap-1.5">
+   291→   291→          {chips.map((c) => (
+   292→   292→            <span
+   293→   293→              key={c.label}
+   294→   294→              className="flex flex-col items-center gap-1 rounded-lg border border-stone-900/[0.07] bg-stone-50 px-1.5 py-2"
+   295→   295→            >
+   296→   296→              <c.icon className="h-3.5 w-3.5 text-emerald-600" strokeWidth={1.8} />
+   297→   297→              <span className="font-mono text-[8px] uppercase tracking-wide text-stone-500">
+   298→   298→                {c.label}
+   299→   299→              </span>
+   300→   300→            </span>
+   301→   301→          ))}
+   302→   302→        </div>
+   303→   303→      </div>
+   304→   304→    </div>
+   305→   305→  );
+   306→   306→}
+   307→   307→
+   308→   308→function ClientChip({
+   309→   309→  name,
+   310→   310→  compact,
+   311→   311→  flash,
+   312→   312→}: {
+   313→   313→  name: string;
+   314→   314→  compact?: boolean;
+   315→   315→  flash?: "served" | "retry" | null;
+   316→   316→}) {
+   317→   317→  return (
+   318→   318→    <div
+   319→   319→      className={cn(
+   320→   320→        "diffuse-card chip-flash flex items-center gap-1.5 whitespace-nowrap rounded-full border border-emerald-600/15 bg-white px-3 py-1.5",
+   321→   321→        compact ? "text-[10px]" : "text-[11.5px]",
+   322→   322→        flash === "served" && "chip-served",
+   323→   323→        flash === "retry" && "chip-retry chip-shake"
+   324→   324→      )}
+   325→   325→    >
+   326→   326→      <span
+   327→   327→        className={cn(
+   328→   328→          "h-1 w-1 rounded-full transition-colors",
+   329→   329→          flash === "retry" ? "bg-amber-500" : "bg-emerald-500/70"
+   330→   330→        )}
+   331→   331→      />
+   332→   332→      <span className="font-mono font-medium text-stone-700">{name}</span>
+   333→   333→    </div>
+   334→   334→  );
+   335→   335→}
+   336→   336→
+   337→   337→/* chips are evenly spaced on the ring, so they cross the hub intake
+   338→   338→   point (left, 180°) in a fixed order — flash each one as it passes */
+   339→   339→const PASS_SEQ = [4, 3, 2, 1, 0, 5];
+   340→   340→const PASS_MS = 38000 / CLIENTS.length;
+   341→   341→
+   342→   342→function Orbit({ scale = 1 }: { scale?: number }) {
+   343→   343→  const compact = scale < 1;
+   344→   344→  const [flash, setFlash] = useState<{
+   345→   345→    i: number;
+   346→   346→    mode: "served" | "retry";
+   347→   347→    count: number;
+   348→   348→  } | null>(null);
+   349→   349→
+   350→   350→  useEffect(() => {
+   351→   351→    let idx = 0;
+   352→   352→    let count = 0;
+   353→   353→    let interval: ReturnType<typeof setInterval> | undefined;
+   354→   354→    let retryT: ReturnType<typeof setTimeout> | undefined;
+   355→   355→    const fire = () => {
+   356→   356→      const i = PASS_SEQ[idx % PASS_SEQ.length];
+   357→   357→      idx += 1;
+   358→   358→      count += 1;
+   359→   359→      if (count % 4 === 0) {
+   360→   360→        /* every 4th pass: a 429 gets absorbed, retried, then smooth again */
+   361→   361→        setFlash({ i, mode: "retry", count });
+   362→   362→        retryT = setTimeout(
+   363→   363→          () => setFlash({ i, mode: "served", count: count + 0.5 }),
+   364→   364→          550
+   365→   365→        );
+   366→   366→      } else {
+   367→   367→        setFlash({ i, mode: "served", count });
+   368→   368→      }
+   369→   369→    };
+   370→   370→    const first = setTimeout(() => {
+   371→   371→      fire();
+   372→   372→      interval = setInterval(fire, PASS_MS);
+   373→   373→    }, 3400);
+   374→   374→    return () => {
+   375→   375→      clearTimeout(first);
+   376→   376→      if (retryT) clearTimeout(retryT);
+   377→   377→      if (interval) clearInterval(interval);
+   378→   378→    };
+   379→   379→  }, []);
+   380→   380→
+   381→   381→  return (
+   382→   382→    <div
+   383→   383→      className="relative"
+   384→   384→      style={{ width: 2 * ORBIT_R * scale, height: 2 * ORBIT_R * scale }}
+   385→   385→    >
+   386→   386→      {/* rings */}
+   387→   387→      <div className="absolute inset-0 rounded-full border border-dashed border-stone-900/15" />
+   388→   388→      <div className="absolute inset-[17%] rounded-full border border-stone-900/[0.07]" />
+   389→   389→      {/* radar dot on inner ring */}
+   390→   390→      <div className="core-ring absolute inset-[17%]">
+   391→   391→        <span className="absolute left-1/2 top-0 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_2px_oklch(0.7_0.14_155/0.45)]" />
+   392→   392→      </div>
+   393→   393→      {/* hub — the stream plugs in here */}
+   394→   394→      <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
+   395→   395→        {flash ? (
+   396→   396→          <span
+   397→   397→            key={flash.count}
+   398→   398→            aria-hidden
+   399→   399→            className="hit-ring absolute left-1/2 top-1/2 h-16 w-16 rounded-2xl border-2 border-emerald-400/60"
+   400→   400→          />
+   401→   401→        ) : null}
+   402→   402→        <div className="hub-pulse flex h-16 w-16 flex-col items-center justify-center rounded-2xl border border-emerald-600/25 bg-white shadow-[0_14px_28px_-12px_oklch(0.6_0.14_155/0.45)]">
+   403→   403→          <Terminal
+   404→   404→            className={cn("text-emerald-600", compact ? "h-4 w-4" : "h-5 w-5")}
+   405→   405→            strokeWidth={1.7}
+   406→   406→          />
+   407→   407→          <span className="mt-0.5 font-mono text-[7.5px] uppercase tracking-[0.2em] text-stone-400">
+   408→   408→            hub
+   409→   409→          </span>
+   410→   410→        </div>
+   411→   411→      </div>
+   412→   412→      {/* revolving clients */}
+   413→   413→      <div className="orbit-ring absolute inset-0">
+   414→   414→        {CLIENTS.map((c, i) => {
+   415→   415→          const angle = (i / CLIENTS.length) * Math.PI * 2 - Math.PI / 2;
+   416→   416→          const left = `${50 + 50 * Math.cos(angle)}%`;
+   417→   417→          const top = `${50 + 50 * Math.sin(angle)}%`;
+   418→   418→          return (
+   419→   419→            <div
+   420→   420→              key={c}
+   421→   421→              className="absolute"
+   422→   422→              style={{ left, top, transform: "translate(-50%,-50%)" }}
+   423→   423→            >
+   424→   424→              <div className="orbit-chip">
+   425→   425→                <ClientChip
+   426→   426→                  name={c}
+   427→   427→                  compact={compact}
+   428→   428→                  flash={flash?.i === i ? flash.mode : null}
+   429→   429→                />
+   430→   430→              </div>
+   431→   431→            </div>
+   432→   432→          );
+   433→   433→        })}
+   434→   434→      </div>
+   435→   435→    </div>
+   436→   436→  );
+   437→   437→}
+   438→   438→
+   439→   439→/* ------------------------------------------------------------------ */
+   440→   440→/* topology panel shell — header, stage slot, live event ticker        */
+   441→   441→/* ------------------------------------------------------------------ */
+   442→   442→
+   443→   443→function TopologyPanel({ children }: { children: ReactNode }) {
+   444→   444→  const { reqs, blocked } = useLiveStats();
+   445→   445→  const evt = useEventTicker();
+   446→   446→  return (
+   447→   447→    <div className="diffuse-card relative overflow-hidden rounded-[1.8rem]">
+   448→   448→      {/* header */}
+   449→   449→      <div className="relative z-10 flex items-center justify-between gap-3 border-b border-stone-900/[0.06] bg-white/60 px-4 py-2.5 sm:px-5">
+   450→   450→        <div className="flex items-center gap-2.5">
+   451→   451→          <span className="relative flex h-2 w-2">
+   452→   452→            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+   453→   453→            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+   454→   454→          </span>
+   455→   455→          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-stone-600">
+   456→   456→            live topology
+   457→   457→          </span>
+   458→   458→        </div>
+   459→   459→        <p className="hidden font-mono text-[10px] uppercase tracking-[0.18em] text-stone-400 md:block">
+   460→   460→          4 upstreams · 12 keys · <span className="text-emerald-600">∞ headroom</span>
+   461→   461→        </p>
+   462→   462→        <div className="flex items-center gap-2">
+   463→   463→          <span className="flex items-center gap-1.5 rounded-lg border border-stone-900/[0.08] bg-white px-2.5 py-1 font-mono text-[10px] text-stone-500">
+   464→   464→            <Zap className="h-3 w-3 text-emerald-600" strokeWidth={2} />
+   465→   465→            <span
+   466→   466→              key={reqs}
+   467→   467→              className="tick-in tnum font-semibold text-stone-900"
+   468→   468→            >
+   469→   469→              {reqs.toLocaleString("en-US")}
+   470→   470→            </span>
+   471→   471→            <span className="hidden sm:inline">routed</span>
+   472→   472→          </span>
+   473→   473→          <span className="hidden items-center gap-1.5 rounded-lg border border-amber-500/20 bg-amber-50 px-2.5 py-1 font-mono text-[10px] text-amber-700 sm:flex">
+   474→   474→            <ShieldAlert className="h-3 w-3" strokeWidth={2} />
+   475→   475→            <span className="tnum font-semibold">{blocked}</span>
+   476→   476→            <span className="hidden md:inline">429 absorbed</span>
+   477→   477→          </span>
+   478→   478→        </div>
+   479→   479→      </div>
+   480→   480→
+   481→   481→      {children}
+   482→   482→
+   483→   483→      {/* footer — live event ticker */}
+   484→   484→      <div className="relative z-10 flex items-center justify-between gap-4 border-t border-stone-900/[0.06] bg-white/60 px-4 py-2.5 sm:px-5">
+   485→   485→        <div className="flex min-w-0 items-center gap-2.5">
+   486→   486→          <span
+   487→   487→            className={cn(
+   488→   488→              "h-1.5 w-1.5 shrink-0 rounded-full",
+   489→   489→              TONE_DOT[evt.tone]
+   490→   490→            )}
+   491→   491→          />
+   492→   492→          <p key={evt.text} className="tick-in truncate font-mono text-[11px] text-stone-500">
+   493→   493→            <span className="text-stone-300">$ </span>
+   494→   494→            {evt.text}
+   495→   495→          </p>
+   496→   496→        </div>
+   497→   497→        <p className="hidden shrink-0 font-mono text-[10px] uppercase tracking-[0.16em] text-stone-400 lg:block">
+   498→   498→          p95 +1.8ms · fail-closed
+   499→   499→        </p>
+   500→   500→      </div>
+   501→   501→    </div>
+   502→   502→  );
+   503→   503→}
+   504→   504→
+   505→   505→/* ------------------------------------------------------------------ */
+   506→   506→/* desktop diagram stage (aspect-locked: svg + html always align)      */
+   507→   507→/* ------------------------------------------------------------------ */
+   508→   508→
+   509→   509→function HeroDiagramDesktop() {
+   510→   510→  return (
+   511→   511→    <div className="hidden lg:block">
+   512→   512→      <TopologyPanel>
+   513→   513→      <div className="relative aspect-[1200/440] w-full">
+   514→   514→        {/* stage backdrop */}
+   515→   515→        <div className="stage-dots absolute inset-0" aria-hidden />
+   516→   516→        <div
+   517→   517→          aria-hidden
+   518→   518→          className="absolute left-[30%] top-[24%] h-[55%] w-[42%] rounded-full bg-emerald-100/50 blur-[80px]"
+   519→   519→        />
+   520→   520→        {/* corner crosshairs */}
+   521→   521→        {[
+   522→   522→          "left-[1.5%] top-[7%]",
+   523→   523→          "right-[1.5%] top-[7%]",
+   524→   524→          "left-[1.5%] bottom-[9%]",
+   525→   525→          "right-[1.5%] bottom-[9%]",
+   526→   526→        ].map((pos) => (
+   527→   527→          <Plus
+   528→   528→            key={pos}
+   529→   529→            aria-hidden
+   530→   530→            className={`absolute ${pos} h-3 w-3 text-stone-300`}
+   531→   531→            strokeWidth={1.5}
+   532→   532→          />
+   533→   533→        ))}
+   534→   534→
+   535→   535→        {/* wires + stream + rings */}
+   536→   536→        <svg
+   537→   537→          viewBox="0 0 1200 440"
+   538→   538→          className="absolute inset-0 h-full w-full"
+   539→   539→          aria-hidden="true"
+   540→   540→        >
+   541→   541→          <defs>
+   542→   542→            <linearGradient
+   543→   543→              id="streamGrad"
+   544→   544→              gradientUnits="userSpaceOnUse"
+   545→   545→              x1="716"
+   546→   546→              y1="218"
+   547→   547→              x2="962"
+   548→   548→              y2="218"
+   549→   549→            >
+   550→   550→              <stop offset="0%" stopColor="#047857" />
+   551→   551→              <stop offset="100%" stopColor="#10b981" />
+   552→   552→            </linearGradient>
+   553→   553→          </defs>
+   554→   554→
+   555→   555→          {/* orbit rings */}
+   556→   556→          <motion.g
+   557→   557→            initial={{ opacity: 0 }}
+   558→   558→            animate={{ opacity: 1 }}
+   559→   559→            transition={{ delay: 1.3, duration: 0.8 }}
+   560→   560→          >
+   561→   561→            <circle
+   562→   562→              cx={ORBIT_CX}
+   563→   563→              cy={ORBIT_CY}
+   564→   564→              r={ORBIT_R}
+   565→   565→              fill="none"
+   566→   566→              stroke="#1c1917"
+   567→   567→              strokeOpacity="0.14"
+   568→   568→              strokeWidth="1.2"
+   569→   569→              strokeDasharray="3 7"
+   570→   570→            />
+   571→   571→            <circle
+   572→   572→              cx={ORBIT_CX}
+   573→   573→              cy={ORBIT_CY}
+   574→   574→              r={ORBIT_R * 0.67}
+   575→   575→              fill="none"
+   576→   576→              stroke="#1c1917"
+   577→   577→              strokeOpacity="0.07"
+   578→   578→              strokeWidth="1"
+   579→   579→            />
+   580→   580→          </motion.g>
+   581→   581→
+   582→   582→          {/* provider wires — width encodes rpm contribution */}
+   583→   583→          {WIRES.map((d, i) => {
+   584→   584→            const rpm = PROVIDERS[i].rpm;
+   585→   585→            const w = 1.8 + rpm / 26;
+   586→   586→            const packetR = 2.4 + rpm / 44;
+   587→   587→            return (
+   588→   588→              <g key={d}>
+   589→   589→                {/* faint static base */}
+   590→   590→                <path
+   591→   591→                  d={d}
+   592→   592→                  fill="none"
+   593→   593→                  stroke="#1c1917"
+   594→   594→                  strokeOpacity="0.1"
+   595→   595→                  strokeWidth="1.2"
+   596→   596→                />
+   597→   597→                {/* draw-in colored path */}
+   598→   598→                <motion.path
+   599→   599→                  d={d}
+   600→   600→                  fill="none"
+   601→   601→                  stroke="#059669"
+   602→   602→                  strokeOpacity="0.7"
+   603→   603→                  strokeWidth={w}
+   604→   604→                  strokeLinecap="round"
+   605→   605→                  initial={{ pathLength: 0 }}
+   606→   606→                  animate={{ pathLength: 1 }}
+   607→   607→                  transition={{ delay: 0.25 + i * 0.13, duration: 0.9, ease: EASE }}
+   608→   608→                />
+   609→   609→                {/* flowing dashes + packets */}
+   610→   610→                <motion.g
+   611→   611→                  initial={{ opacity: 0 }}
+   612→   612→                  animate={{ opacity: 1 }}
+   613→   613→                  transition={{ delay: 1.05 + i * 0.13, duration: 0.5 }}
+   614→   614→                >
+   615→   615→                  <path
+   616→   616→                    d={d}
+   617→   617→                    fill="none"
+   618→   618→                    stroke="#34d399"
+   619→   619→                    strokeOpacity="0.7"
+   620→   620→                    strokeWidth={w * 0.55}
+   621→   621→                    strokeLinecap="round"
+   622→   622→                    className="wire-flow"
+   623→   623→                    style={{ animationDelay: `${i * 0.22}s` }}
+   624→   624→                  />
+   625→   625→                  {[0, 1].map((k) => (
+   626→   626→                    <g key={k}>
+   627→   627→                      <circle r={packetR + 2.6} fill="#10b981" opacity="0.22" />
+   628→   628→                      <circle r={packetR} fill="#059669" />
+   629→   629→                      <animateMotion
+   630→   630→                        dur="2s"
+   631→   631→                        begin={`${-(i * 0.45 + k * 1)}s`}
+   632→   632→                        repeatCount="indefinite"
+   633→   633→                        path={d}
+   634→   634→                      />
+   635→   635→                    </g>
+   636→   636→                  ))}
+   637→   637→                </motion.g>
+   638→   638→              </g>
+   639→   639→            );
+   640→   640→          })}
+   641→   641→
+   642→   642→          {/* the one thick stream — glow + drawn body + shimmer + packets */}
+   643→   643→          <motion.path
+   644→   644→            d={STREAM}
+   645→   645→            fill="none"
+   646→   646→            stroke="#10b981"
+   647→   647→            strokeOpacity="0.16"
+   648→   648→            strokeWidth="30"
+   649→   649→            strokeLinecap="round"
+   650→   650→            initial={{ opacity: 0 }}
+   651→   651→            animate={{ opacity: 1 }}
+   652→   652→            transition={{ delay: 1.0, duration: 0.6 }}
+   653→   653→          />
+   654→   654→          <motion.path
+   655→   655→            d={STREAM}
+   656→   656→            fill="none"
+   657→   657→            stroke="url(#streamGrad)"
+   658→   658→            strokeWidth="14"
+   659→   659→            strokeLinecap="round"
+   660→   660→            initial={{ pathLength: 0 }}
+   661→   661→            animate={{ pathLength: 1 }}
+   662→   662→            transition={{ delay: 1.05, duration: 0.85, ease: EASE }}
+   663→   663→          />
+   664→   664→          <motion.g
+   665→   665→            initial={{ opacity: 0 }}
+   666→   666→            animate={{ opacity: 1 }}
+   667→   667→            transition={{ delay: 1.65, duration: 0.5 }}
+   668→   668→          >
+   669→   669→            <path
+   670→   670→              d={STREAM}
+   671→   671→              fill="none"
+   672→   672→              stroke="#d1fae5"
+   673→   673→              strokeOpacity="0.85"
+   674→   674→              strokeWidth="5"
+   675→   675→              strokeLinecap="round"
+   676→   676→              className="stream-flow"
+   677→   677→            />
+   678→   678→            {[0, 1, 2].map((k) => (
+   679→   679→              <g key={k}>
+   680→   680→                <circle r="8.5" fill="#10b981" opacity="0.25" />
+   681→   681→                <circle r="4.6" fill="#a7f3d0" />
+   682→   682→                <animateMotion
+   683→   683→                  dur="1.25s"
+   684→   684→                  begin={`${-k * 0.42}s`}
+   685→   685→                  repeatCount="indefinite"
+   686→   686→                  path={STREAM}
+   687→   687→                />
+   688→   688→              </g>
+   689→   689→            ))}
+   690→   690→          </motion.g>
+   691→   691→        </svg>
+   692→   692→
+   693→   693→        {/* provider cards */}
+   694→   694→        {PROVIDERS.map((p, i) => (
+   695→   695→          <div
+   696→   696→            key={p.name}
+   697→   697→            className="absolute w-[21%]"
+   698→   698→            style={{ left: "0.5%", top: `${(18 + i * 104) / 4.4}%` }}
+   699→   699→          >
+   700→   700→            <ProviderCard p={p} i={i} />
+   701→   701→          </div>
+   702→   702→        ))}
+   703→   703→
+   704→   704→        {/* proxy core */}
+   705→   705→        <div
+   706→   706→          className="absolute -translate-x-1/2 -translate-y-1/2"
+   707→   707→          style={{ left: "48.3%", top: "49.5%" }}
+   708→   708→        >
+   709→   709→          <motion.div
+   710→   710→            initial={{ opacity: 0, scale: 0.85 }}
+   711→   711→            animate={{ opacity: 1, scale: 1 }}
+   712→   712→            transition={{ delay: 0.7, duration: 0.8, ease: EASE }}
+   713→   713→          >
+   714→   714→            <ProxyCore />
+   715→   715→          </motion.div>
+   716→   716→        </div>
+   717→   717→
+   718→   718→        {/* 166 RPM badge — rides the stream, snug against the hub */}
+   719→   719→        <div
+   720→   720→          className="absolute z-10 -translate-x-1/2 -translate-y-1/2"
+   721→   721→          style={{ left: "75.6%", top: "49.5%" }}
+   722→   722→        >
+   723→   723→          <motion.div
+   724→   724→            initial={{ opacity: 0, scale: 0.7 }}
+   725→   725→            animate={{ opacity: 1, scale: 1 }}
+   726→   726→            transition={{ delay: 1.75, duration: 0.7, ease: EASE }}
+   727→   727→          >
+   728→   728→            <div className="glass rounded-2xl px-4 py-2 text-center">
+   729→   729→              <p className="tnum font-mono text-xl font-bold leading-none text-emerald-700">
+   730→   730→                <Counter to={166} duration={2.2} />
+   731→   731→              </p>
+   732→   732→              <p className="mt-1 font-mono text-[8.5px] uppercase tracking-[0.18em] text-stone-500">
+   733→   733→                rpm combined
+   734→   734→              </p>
+   735→   735→              <p className="mt-0.5 flex items-center justify-center gap-1 font-mono text-[8px] uppercase tracking-[0.14em] text-emerald-600">
+   736→   736→                <Plus className="h-2 w-2" strokeWidth={2.4} />
+   737→   737→                every key adds more
+   738→   738→              </p>
+   739→   739→            </div>
+   740→   740→          </motion.div>
+   741→   741→        </div>
+   742→   742→
+   743→   743→        {/* orbit of clients */}
+   744→   744→        <div
+   745→   745→          className="absolute -translate-x-1/2 -translate-y-1/2"
+   746→   746→          style={{
+   747→   747→            left: `${(ORBIT_CX / 1200) * 100}%`,
+   748→   748→            top: `${(ORBIT_CY / 440) * 100}%`,
+   749→   749→          }}
+   750→   750→        >
+   751→   751→          <motion.div
+   752→   752→            initial={{ opacity: 0, scale: 0.9 }}
+   753→   753→            animate={{ opacity: 1, scale: 1 }}
+   754→   754→            transition={{ delay: 1.35, duration: 0.9, ease: EASE }}
+   755→   755→          >
+   756→   756→            <Orbit />
+   757→   757→          </motion.div>
+   758→   758→        </div>
+   759→   759→
+   760→   760→        {/* stage captions */}
+   761→   761→        {STAGES.map((s) => (
+   762→   762→          <div
+   763→   763→            key={s.n}
+   764→   764→            className="absolute bottom-[1%] -translate-x-1/2 text-center"
+   765→   765→            style={{ left: s.left }}
+   766→   766→          >
+   767→   767→            <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-stone-400">
+   768→   768→              <span className="font-semibold text-emerald-600">{s.n}</span> · {s.t}
+   769→   769→            </p>
+   770→   770→          </div>
+   771→   771→        ))}
+   772→   772→      </div>
+   773→   773→    </TopologyPanel>
+   774→   774→    </div>
+   775→   775→  );
+   776→   776→}
+   777→   777→
+   778→   778→/* ------------------------------------------------------------------ */
+   779→   779→/* mobile diagram                                                      */
+   780→   780→/* ------------------------------------------------------------------ */
+   781→   781→
+   782→   782→function HeroDiagramMobile() {
+   783→   783→  return (
+   784→   784→    <div className="lg:hidden">
+   785→   785→      <TopologyPanel>
+   786→   786→        <div className="flex flex-col items-center gap-5 px-4 py-6">
+   787→   787→          <div className="grid w-full grid-cols-2 gap-2.5">
+   788→   788→            {PROVIDERS.map((p, i) => (
+   789→   789→              <ProviderCard key={p.name} p={p} i={i} compact />
+   790→   790→            ))}
+   791→   791→          </div>
+   792→   792→
+   793→   793→          <div className="flex flex-col items-center">
+   794→   794→            <svg width="14" height="34" viewBox="0 0 14 34" aria-hidden="true">
+   795→   795→              <line
+   796→   796→                x1="7"
+   797→   797→                y1="0"
+   798→   798→                x2="7"
+   799→   799→                y2="34"
+   800→   800→                stroke="#34d399"
+   801→   801→                strokeOpacity="0.8"
+   802→   802→                strokeWidth="1.6"
+   803→   803→                className="wire-flow"
+   804→   804→              />
+   805→   805→            </svg>
+   806→   806→            <ArrowDown className="h-3.5 w-3.5 text-emerald-600" strokeWidth={1.8} />
+   807→   807→          </div>
+   808→   808→
+   809→   809→          <ProxyCore />
+   810→   810→
+   811→   811→          <div className="relative flex w-full max-w-[320px] flex-col items-center">
+   812→   812→            <div className="h-3.5 w-full overflow-hidden rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400">
+   813→   813→              <div className="stream-flow absolute inset-0 bg-[repeating-linear-gradient(90deg,transparent,transparent_14px,oklch(0.98_0.02_155/0.75)_14px,oklch(0.98_0.02_155/0.75)_24px)]" />
+   814→   814→            </div>
+   815→   815→            <div className="glass absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-xl px-3 py-1.5 text-center">
+   816→   816→              <p className="tnum font-mono text-sm font-bold leading-none text-emerald-700">
+   817→   817→                166 <span className="text-[9px] font-semibold uppercase tracking-wider text-stone-500">rpm combined</span>
+   818→   818→              </p>
+   819→   819→            </div>
+   820→   820→          </div>
+   821→   821→
+   822→   822→          <div className="mt-4 scale-[0.68]">
+   823→   823→            <Orbit />
+   824→   824→          </div>
+   825→   825→
+   826→   826→          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5">
+   827→   827→            {STAGES.map((s) => (
+   828→   828→              <p
+   829→   829→                key={s.n}
+   830→   830→                className="font-mono text-[8.5px] uppercase tracking-[0.18em] text-stone-400"
+   831→   831→              >
+   832→   832→                <span className="font-semibold text-emerald-600">{s.n}</span> · {s.t}
+   833→   833→              </p>
+   834→   834→            ))}
+   835→   835→          </div>
+   836→   836→        </div>
+   837→   837→      </TopologyPanel>
+   838→   838→    </div>
+   839→   839→  );
+   840→   840→}
+   841→   841→
+   842→   842→/* ------------------------------------------------------------------ */
+   843→   843→/* hero right stat card                                                */
+   844→   844→/* ------------------------------------------------------------------ */
+   845→   845→
+   846→   846→function RpmCard() {
+   847→   847→  const bars = PROVIDERS;
+   848→   848→  const pts = useMemo(() => seededPoints(), []);
+   849→   849→  const spark = useMemo(() => buildSpark(pts), [pts]);
+   850→   850→  const [util, setUtil] = useState(158);
+   851→   851→  useEffect(() => {
+   852→   852→    const t = setInterval(() => setUtil(152 + Math.floor(Math.random() * 14)), 2100);
+   853→   853→    return () => clearInterval(t);
+   854→   854→  }, []);
+   855→   855→
+   856→   856→  return (
+   857→   857→    <div className="diffuse-card relative overflow-hidden rounded-[1.6rem] p-6">
+   858→   858→      <div className="pointer-events-none absolute -right-10 -top-14 h-44 w-44 rounded-full bg-emerald-200/40 blur-3xl" />
+   859→   859→      <div className="flex items-center justify-between">
+   860→   860→        <p className="font-mono text-[10px] font-medium uppercase tracking-[0.22em] text-stone-400">
+   861→   861→          combined capacity
+   862→   862→        </p>
+   863→   863→        <span className="flex items-center gap-1.5 rounded-full border border-emerald-600/20 bg-emerald-50 px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+   864→   864→          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 heartbeat-dot" />
+   865→   865→          live
+   866→   866→        </span>
+   867→   867→      </div>
+   868→   868→      <div className="mt-2 flex items-end gap-3">
+   869→   869→        <span className="font-mono text-[4.6rem] font-bold leading-[0.85] tracking-tighter text-stone-900">
+   870→   870→          ∞
+   871→   871→        </span>
+   872→   872→        <div className="pb-1.5">
+   873→   873→          <p className="tnum font-mono text-sm font-semibold text-emerald-700">
+   874→   874→            <Counter to={166} /> RPM pooled
+   875→   875→          </p>
+   876→   876→          <p className="text-[12px] leading-snug text-stone-500">
+   877→   877→            effective ceiling for
+   878→   878→            <br />
+   879→   879→            every connected agent
+   880→   880→          </p>
+   881→   881→        </div>
+   882→   882→      </div>
+   883→   883→
+   884→   884→      {/* live utilization sparkline */}
+   885→   885→      <div className="mt-5 flex items-center justify-between">
+   886→   886→        <p className="font-mono text-[9.5px] uppercase tracking-[0.2em] text-stone-400">
+   887→   887→          pool utilization · last 60s
+   888→   888→        </p>
+   889→   889→        <p className="tnum font-mono text-[11px] font-semibold text-emerald-700">
+   890→   890→          {util} rpm
+   891→   891→        </p>
+   892→   892→      </div>
+   893→   893→      <svg
+   894→   894→        viewBox="0 0 300 64"
+   895→   895→        preserveAspectRatio="none"
+   896→   896→        className="mt-1.5 h-16 w-full"
+   897→   897→        aria-hidden="true"
+   898→   898→      >
+   899→   899→        <defs>
+   900→   900→          <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
+   901→   901→            <stop offset="0%" stopColor="#10b981" stopOpacity="0.26" />
+   902→   902→            <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+   903→   903→          </linearGradient>
+   904→   904→        </defs>
+   905→   905→        {/* 166 ceiling */}
+   906→   906→        <line
+   907→   907→          x1="5"
+   908→   908→          x2="295"
+   909→   909→          y1={spark.ceilingY}
+   910→   910→          y2={spark.ceilingY}
+   911→   911→          stroke="#a8a29e"
+   912→   912→          strokeOpacity="0.55"
+   913→   913→          strokeWidth="1"
+   914→   914→          strokeDasharray="3 4"
+   915→   915→        />
+   916→   916→        <text
+   917→   917→          x="295"
+   918→   918→          y={spark.ceilingY - 4}
+   919→   919→          textAnchor="end"
+   920→   920→          fontSize="7.5"
+   921→   921→          fill="#a8a29e"
+   922→   922→          className="font-mono"
+   923→   923→          letterSpacing="0.08em"
+   924→   924→        >
+   925→   925→          166 CEILING
+   926→   926→        </text>
+   927→   927→        <motion.path
+   928→   928→          d={spark.area}
+   929→   929→          fill="url(#sparkFill)"
+   930→   930→          initial={{ opacity: 0 }}
+   931→   931→          animate={{ opacity: 1 }}
+   932→   932→          transition={{ delay: 1.0, duration: 1 }}
+   933→   933→        />
+   934→   934→        <motion.path
+   935→   935→          d={spark.line}
+   936→   936→          fill="none"
+   937→   937→          stroke="#059669"
+   938→   938→          strokeWidth="1.8"
+   939→   939→          strokeLinecap="round"
+   940→   940→          initial={{ pathLength: 0 }}
+   941→   941→          animate={{ pathLength: 1 }}
+   942→   942→          transition={{ delay: 0.45, duration: 1.5, ease: EASE }}
+   943→   943→        />
+   944→   944→        <circle
+   945→   945→          cx={spark.last[0]}
+   946→   946→          cy={spark.last[1]}
+   947→   947→          r="3"
+   948→   948→          fill="#059669"
+   949→   949→          className="heartbeat-dot"
+   950→   950→        />
+   951→   951→      </svg>
+   952→   952→
+   953→   953→      <div className="mt-4 flex flex-col gap-2.5">
+   954→   954→        {bars.map((b, i) => (
+   955→   955→          <div key={b.name} className="flex items-center gap-2.5">
+   956→   956→            <span className="w-[84px] shrink-0 truncate font-mono text-[10px] uppercase tracking-wider text-stone-400">
+   957→   957→              {b.short}
+   958→   958→            </span>
+   959→   959→            <div className="h-[7px] flex-1 overflow-hidden rounded-full bg-stone-100">
+   960→   960→              <motion.div
+   961→   961→                initial={{ width: 0 }}
+   962→   962→                animate={{ width: `${(b.rpm / 80) * 100}%` }}
+   963→   963→                transition={{ delay: 0.5 + i * 0.15, duration: 1.1, ease: EASE }}
+   964→   964→                className="h-full rounded-full bg-gradient-to-r from-emerald-600/80 to-emerald-400"
+   965→   965→              />
+   966→   966→            </div>
+   967→   967→            <span className="tnum w-8 text-right font-mono text-[11px] font-semibold text-stone-700">
+   968→   968→              {b.rpm}
+   969→   969→            </span>
+   970→   970→          </div>
+   971→   971→        ))}
+   972→   972→      </div>
+   973→   973→      <p className="mt-5 border-t border-stone-900/[0.07] pt-3.5 font-mono text-[10.5px] leading-relaxed text-stone-400">
+   974→   974→        80 + 40 + 16 + 50 = <span className="font-semibold text-stone-600">166 RPM</span>{" "}
+   975→   975→        — every key keeps its own limit. your agents never see one.
+   976→   976→      </p>
+   977→   977→    </div>
+   978→   978→  );
+   979→   979→}
+   980→   980→
+   981→   981→/* ------------------------------------------------------------------ */
+   982→   982→/* hero                                                                */
+   983→   983→/* ------------------------------------------------------------------ */
+   984→   984→
+   985→   985→export function Hero() {
+   986→   986→  return (
+   987→   987→    <section id="top" className="relative overflow-hidden pb-14 pt-32 md:pt-40">
+   988→   988→      {/* backdrop */}
+   989→   989→      <div className="blueprint-grid absolute inset-0" aria-hidden />
+   990→   990→      <div
+   991→   991→        aria-hidden
+   992→   992→        className="aurora absolute -top-32 left-[8%] h-[420px] w-[420px] rounded-full bg-emerald-200/35 blur-[110px]"
+   993→   993→      />
+   994→   994→      <div
+   995→   995→        aria-hidden
+   996→   996→        className="aurora absolute right-[4%] top-40 h-[360px] w-[360px] rounded-full bg-amber-100/50 blur-[110px]"
+   997→   997→        style={{ animationDelay: "-7s" }}
+   998→   998→      />
+   999→   999→
+  1000→  1000→      <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
+  1001→  1001→        <div className="grid items-center gap-10 lg:grid-cols-[1.35fr_1fr] lg:gap-14">
+  1002→  1002→          {/* left — copy */}
+  1003→  1003→          <div className="cascade flex flex-col items-start gap-6">
+  1004→  1004→            <span className="inline-flex items-center gap-2 rounded-full border border-stone-900/10 bg-white/80 px-3.5 py-1.5 font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-stone-600">
+  1005→  1005→              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 heartbeat-dot" />
+  1006→  1006→              OpenAI-compatible · Self-hosted · MIT
+  1007→  1007→            </span>
+  1008→  1008→
+  1009→  1009→            <h1 className="text-balance text-[2.6rem] font-semibold leading-[1.02] tracking-tighter text-stone-900 sm:text-6xl lg:text-[4.35rem]">
+  1010→  1010→              Run AI agents without fighting{" "}
+  1011→  1011→              <span className="relative inline-block whitespace-nowrap text-emerald-700">
+  1012→  1012→                rate limits.
+  1013→  1013→                <svg
+  1014→  1014→                  className="absolute -bottom-1.5 left-0 w-full"
+  1015→  1015→                  viewBox="0 0 220 10"
+  1016→  1016→                  fill="none"
+  1017→  1017→                  aria-hidden
+  1018→  1018→                  preserveAspectRatio="none"
+  1019→  1019→                >
+  1020→  1020→                  <path
+  1021→  1021→                    d="M3 7 C 60 2, 150 2, 217 6"
+  1022→  1022→                    stroke="#10b981"
+  1023→  1023→                    strokeOpacity="0.55"
+  1024→  1024→                    strokeWidth="3"
+  1025→  1025→                    strokeLinecap="round"
+  1026→  1026→                  />
+  1027→  1027→                  <path
+  1028→  1028→                    d="M8 8.5 C 70 4.5, 148 4, 212 7.5"
+  1029→  1029→                    stroke="#059669"
+  1030→  1030→                    strokeOpacity="0.3"
+  1031→  1031→                    strokeWidth="1.8"
+  1032→  1032→                    strokeLinecap="round"
+  1033→  1033→                  />
+  1034→  1034→                </svg>
+  1035→  1035→              </span>
+  1036→  1036→            </h1>
+  1037→  1037→
+  1038→  1038→            <p className="max-w-[58ch] text-[15.5px] leading-relaxed text-stone-500 md:text-[17px]">
+  1039→  1039→              One OpenAI-compatible endpoint for all your providers and API keys.
+  1040→  1040→              open-proxy queues, paces, load-balances, retries and fails over
+  1041→  1041→              across your keys — so your agents keep running instead of hitting
+  1042→  1042→              429s.
+  1043→  1043→            </p>
+  1044→  1044→
+  1045→  1045→            <div className="flex flex-wrap items-center gap-3">
+  1046→  1046→              <a
+  1047→  1047→                href="#quickstart"
+  1048→  1048→                className="group inline-flex items-center gap-2 rounded-xl bg-stone-900 px-6 py-3.5 text-[15px] font-medium text-stone-50 shadow-[0_18px_36px_-16px_oklch(0.216_0.008_90/0.5)] transition-all hover:-translate-y-0.5 hover:bg-stone-800 active:translate-y-0"
+  1049→  1049→              >
+  1050→  1050→                Get Started
+  1051→  1051→                <ArrowRight
+  1052→  1052→                  className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1"
+  1053→  1053→                  strokeWidth={1.8}
+  1054→  1054→                />
+  1055→  1055→              </a>
+  1056→  1056→              <a
+  1057→  1057→                href="https://github.com/miztertea/nim-proxy"
+  1058→  1058→                target="_blank"
+  1059→  1059→                rel="noreferrer"
+  1060→  1060→                className="inline-flex items-center gap-2 rounded-xl border border-stone-900/12 bg-white px-6 py-3.5 text-[15px] font-medium text-stone-800 transition-all hover:-translate-y-0.5 hover:border-stone-900/25 active:translate-y-0"
+  1061→  1061→              >
+  1062→  1062→                <Github className="h-4 w-4" strokeWidth={1.8} />
+  1063→  1063→                View on GitHub
+  1064→  1064→              </a>
+  1065→  1065→            </div>
+  1066→  1066→
+  1067→  1067→            {/* live stat strip */}
+  1068→  1068→            <div className="grid w-full max-w-xl grid-cols-2 gap-px overflow-hidden rounded-2xl border border-stone-900/[0.08] bg-stone-900/[0.06] sm:grid-cols-4">
+  1069→  1069→              {STATS.map((s) => (
+  1070→  1070→                <div key={s.l} className="flex flex-col gap-0.5 bg-white/90 px-4 py-3">
+  1071→  1071→                  <span className="flex items-center gap-1.5 font-mono text-[13px] font-semibold tracking-tight text-stone-900">
+  1072→  1072→                    <s.icon className="h-3.5 w-3.5 text-emerald-600" strokeWidth={1.9} />
+  1073→  1073→                    {s.v}
+  1074→  1074→                  </span>
+  1075→  1075→                  <span className="font-mono text-[8.5px] uppercase tracking-[0.14em] text-stone-400">
+  1076→  1076→                    {s.l}
+  1077→  1077→                  </span>
+  1078→  1078→                </div>
+  1079→  1079→              ))}
+  1080→  1080→            </div>
+  1081→  1081→          </div>
+  1082→  1082→
+  1083→  1083→          {/* right — rpm card */}
+  1084→  1084→          <motion.div
+  1085→  1085→            initial={{ opacity: 0, y: 30, rotate: 1.5 }}
+  1086→  1086→            animate={{ opacity: 1, y: 0, rotate: 0 }}
+  1087→  1087→            transition={{ delay: 0.35, duration: 1, ease: EASE }}
+  1088→  1088→          >
+  1089→  1089→            <RpmCard />
+  1090→  1090→          </motion.div>
+  1091→  1091→        </div>
+  1092→  1092→
+  1093→  1093→        {/* diagram */}
+  1094→  1094→        <motion.div
+  1095→  1095→          initial={{ opacity: 0, y: 44 }}
+  1096→  1096→          animate={{ opacity: 1, y: 0 }}
+  1097→  1097→          transition={{ delay: 0.55, duration: 1.1, ease: EASE }}
+  1098→  1098→          className="mt-16 md:mt-20"
+  1099→  1099→        >
+  1100→  1100→          <HeroDiagramDesktop />
+  1101→  1101→          <HeroDiagramMobile />
+  1102→  1102→          <p className="mx-auto mt-8 max-w-[70ch] text-center text-[13px] leading-relaxed text-stone-400">
+  1103→  1103→            Your application sees one API. open-proxy handles the complexity
+  1104→  1104→            behind it — one thick stream out, every upstream limit quietly
+  1105→  1105→            respected.
+  1106→  1106→          </p>
+  1107→  1107→        </motion.div>
+  1108→  1108→      </div>
+  1109→  1109→    </section>
+  1110→  1110→  );
+  1111→  1111→}
+  1112→  1112→
+  1113→  1113→
