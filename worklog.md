@@ -271,3 +271,31 @@ Verification:
 
 Stage Summary:
 - DONE. Load-test section fully removed. Files: page.tsx, loadtest.tsx (deleted).
+
+---
+Task ID: 12
+Agent: main (Super Z)
+Task: Day/night theme toggle — night theme styled after the dark CTA card aesthetic the user liked (warm charcoal + emerald)
+
+Work Log:
+- Re-tuned the existing .dark token block from blue (hue 260) to WARM CHARCOAL (hue 90): bg oklch(0.152 0.004 90) ~#141210, elevated surfaces ~#1c1917 (stone-900), stone-100 foreground, emerald ring/accents unchanged
+- Built a curated override sheet in globals.css (unlayered html.dark rules beat @layer utilities): ink scale (stone-900->100 ... stone-300->500), surfaces (bg-white -> stone-900; white/60-90 -> dark glass; stone-50/100/200/300 -> white at 4/6/9/14%; bg-[#f5f4f2] dashboard mock -> dark console), emerald/amber tints -> translucent glows, all border-stone-900/* alphas -> white borders, hover variants, text accents (emerald-600/700/800 -> 400/300, amber/rose -> 400-level)
+- GUARD on ink/surface/tint rules: :not(:is(.bg-stone-900 *, .bg-stone-950 *, [class*="0c0a09"] *)) so the PrivacyBand, FinalCta card and ALL code terminals keep their native palette (verified in screenshots)
+- Design-system classes overridden: .glass, .diffuse-card, .blueprint-grid, .stage-dots, .grain (0.05), .nice-scroll, .shimmer, .chip-served -> new opx-charge-dark keyframes (dark end state instead of white)
+- Nav CTA (a.bg-stone-900) becomes emerald primary with dark text in night mode — matching the reference card's CTA
+- ThemeToggle component (theme-toggle.tsx): useSyncExternalStore on <html> class (MutationObserver subscription — no setState-in-effect, lint-clean), Sun/Moon icons swapped purely via CSS (dark:block/dark:hidden) so SSR/pre-hydration paint is always correct, View Transitions API cross-fade on toggle (reduced-motion aware), localStorage "opx-theme" persistence
+- layout.tsx: inline no-FOUC script as first body child (applies stored theme, else prefers-color-scheme) + suppressHydrationWarning already present; viewport.themeColor now light/dark media pair
+- Marquee edge fades + footer watermark got dark: gradient variants in JSX
+- Second-pass sweep diffed every stone/white/emerald/amber/rose token against the sheet — added missing tints (bg-amber-50/70, bg-emerald-50/70, bg-emerald-100/70, bg-stone-900/[0.07|0.09], text-amber-700/800, extra borders) after docs callouts rendered light in night mode
+
+Verification:
+- bun run lint: clean (fixed react-hooks/set-state-in-effect by switching to useSyncExternalStore)
+- Day mode byte-identical restore after toggling back (screenshot); starts light in headless (no color-scheme preference)
+- Night: hero/mid/end screenshots — warm charcoal, emerald CTA, guarded dark surfaces untouched, dark watermark gradient, rail flipped
+- Persistence: localStorage survives reload (dark stays dark)
+- /docs night: header, TOC, prose, tables, code blocks, callouts all correct after second pass
+- Mobile 390: toggle visible next to hamburger, hero night correct
+- Console + page errors: clean on both routes
+
+Stage Summary:
+- DONE. Full day/night theming with nav toggle (desktop + mobile, / and /docs), warm-charcoal night palette matching the dark CTA reference, no-FOUC load, persisted preference, View Transition cross-fade. Files: globals.css, theme-toggle.tsx (new), nav.tsx, layout.tsx, marquee.tsx, final.tsx.

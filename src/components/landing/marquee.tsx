@@ -21,8 +21,8 @@ export function Marquee() {
       aria-label="Compatible clients"
       className="marquee-paused relative border-y border-stone-900/[0.07] bg-white/60 py-5"
     >
-      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-24 bg-gradient-to-r from-[oklch(0.985_0.003_90)] to-transparent" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-24 bg-gradient-to-l from-[oklch(0.985_0.003_90)] to-transparent" />
+      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-24 bg-gradient-to-r from-[oklch(0.985_0.003_90)] to-transparent dark:from-[oklch(0.152_0.004_90)]" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-24 bg-gradient-to-l from-[oklch(0.985_0.003_90)] to-transparent dark:from-[oklch(0.152_0.004_90)]" />
       <div className="overflow-hidden">
         <div className="animate-marquee flex w-max items-center gap-10 pr-10">
           {doubled.map((item, i) => (

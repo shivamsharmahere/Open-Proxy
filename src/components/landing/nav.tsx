@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, BookOpen, Github, Menu, X } from "lucide-react";
 import { LogoMark } from "./logo";
+import { ThemeToggle } from "./theme-toggle";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
@@ -89,6 +90,7 @@ export function Nav({
         </div>
 
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <a
             href="https://github.com/shivamsharmahere/Open-Proxy"
             target="_blank"

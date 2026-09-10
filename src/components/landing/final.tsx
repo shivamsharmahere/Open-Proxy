@@ -217,7 +217,7 @@ function Watermark() {
   return (
     <div ref={ref} aria-hidden className="relative mt-10 select-none overflow-hidden px-1 pb-1">
       <motion.div style={{ y }} className="pointer-events-none">
-        <span className="block whitespace-nowrap bg-gradient-to-b from-stone-300 via-stone-200 to-stone-100/20 bg-clip-text text-center text-[17.5vw] font-semibold leading-none tracking-[-0.045em] text-transparent">
+        <span className="block whitespace-nowrap bg-gradient-to-b from-stone-300 via-stone-200 to-stone-100/20 bg-clip-text text-center text-[17.5vw] font-semibold leading-none tracking-[-0.045em] text-transparent dark:from-stone-700 dark:via-stone-800 dark:to-stone-900/10">
           open-proxy
         </span>
       </motion.div>
