@@ -102,3 +102,21 @@ Verification:
 
 Stage Summary:
 - DONE. Docs page live at /docs; files: src/content/openproxy-docs.md, src/lib/docs-parser.ts, src/components/docs/{docs-ui,docs-content}.tsx, src/app/docs/page.tsx, nav.tsx, final.tsx, globals.css
+
+---
+Task ID: 4-resume
+Agent: main (Super Z)
+Task: Post-resume re-verification of the /docs page (session was continued from summary; implementation was already on disk)
+
+Work Log:
+- Confirmed all Task 4 artifacts exist and dev server serves / and /docs with 200 (dev.log clean)
+- bun run lint: clean
+- agent-browser desktop 1440x900: header band + 2-level sidebar TOC + numbered sections + dark code blocks + endpoints METHOD/PATH/DESCRIPTION table all render correctly
+- TOC click navigation works (API Reference -> scrollY 10445); scroll-spy active state follows headings (112px threshold behavior confirmed)
+- Copy button: JS el.click() does NOT produce the copied state in headless (clipboard write throws, legacy execCommand path needs user activation) — real CDP mouse click (mouse move + down + up at button coords) flips it to "copied" as documented in Task 4
+- Mobile 390x844: header band, chips, CTAs, CONTENTS <details> accordion opens with 2-level TOC + active highlight
+- Cross-route nav: landing "/" -> click Docs -> lands on /docs with correct h1; no console/page errors
+- Kept screenshots: download/verify-docs-desktop.png, download/verify-docs-mobile.png (other temp shots removed)
+
+Stage Summary:
+- VERIFIED. /docs page fully functional on desktop + mobile; no regressions on landing. No code changes needed in this pass.
