@@ -32,7 +32,7 @@ const AUDIENCES = [
 
 export function Audience() {
   return (
-    <section className="relative py-24 md:py-32">
+    <section className="relative py-14 md:py-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <SectionHeading
           eyebrow="who it's for"
@@ -40,7 +40,7 @@ export function Audience() {
           sub="From a solo developer with two free NIM keys to a platform team pooling dozens of upstream accounts."
         />
 
-        <div className="mt-14 grid gap-5 md:grid-cols-12">
+        <div className="mt-10 grid gap-5 md:grid-cols-12">
           {AUDIENCES.map((a, i) => (
             <Reveal
               key={a.title}

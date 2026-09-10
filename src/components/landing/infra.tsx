@@ -69,7 +69,7 @@ const STATS = [
 
 export function Infra() {
   return (
-    <section className="relative py-24 md:py-32">
+    <section className="relative py-14 md:py-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <SectionHeading
           eyebrow="production posture"
@@ -83,7 +83,7 @@ export function Infra() {
           sub="A single static binary with hardened defaults. No Grafana, no frontend build, no runtime dependencies — the dashboard, metrics and catalogs are embedded at compile time."
         />
 
-        <div className="mt-14 grid grid-cols-2 gap-px overflow-hidden rounded-[1.6rem] border border-stone-900/[0.07] bg-stone-900/[0.07] md:grid-cols-3 lg:grid-cols-6">
+        <div className="mt-10 grid grid-cols-2 gap-px overflow-hidden rounded-[1.6rem] border border-stone-900/[0.07] bg-stone-900/[0.07] md:grid-cols-3 lg:grid-cols-6">
           {STATS.map((s, i) => (
             <Reveal
               key={s.label}
@@ -155,7 +155,7 @@ function SecCol({ items }: { items: typeof SEC_LEFT }) {
 
 export function Security() {
   return (
-    <section className="relative py-24 md:py-32">
+    <section id="security" className="relative py-14 md:py-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="grid gap-12 lg:grid-cols-[0.9fr_1.4fr] lg:gap-20">
           <div>

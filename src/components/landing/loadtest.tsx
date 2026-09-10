@@ -6,7 +6,7 @@ import { SectionHeading, Reveal, Counter } from "./reveal";
 
 export function LoadTest() {
   return (
-    <section className="relative overflow-hidden py-24 md:py-32">
+    <section className="relative overflow-hidden py-14 md:py-20">
       <div
         aria-hidden
         className="absolute left-[-8%] top-1/3 h-[380px] w-[380px] rounded-full bg-emerald-100/50 blur-[120px]"
@@ -20,7 +20,7 @@ export function LoadTest() {
         />
 
         <Reveal delay={0.15}>
-          <div className="mx-auto mt-14 grid max-w-4xl items-center gap-6 md:grid-cols-[1fr_auto_1fr]">
+          <div className="mx-auto mt-10 grid max-w-4xl items-center gap-6 md:grid-cols-[1fr_auto_1fr]">
             {/* 100 clients */}
             <div className="diffuse-card relative flex flex-col items-center gap-2 rounded-[1.6rem] px-6 py-9">
               <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-stone-400">

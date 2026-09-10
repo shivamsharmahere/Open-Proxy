@@ -137,7 +137,7 @@ const WITH: Line[] = [
 
 export function Compare() {
   return (
-    <section id="how" className="relative py-24 md:py-32">
+    <section id="how" className="relative py-14 md:py-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <SectionHeading
           eyebrow="the 429 tax"
@@ -151,7 +151,7 @@ export function Compare() {
           sub="One key, 40 requests per minute. The moment an agent bursts past it, the provider answers 429 — and most clients simply abort the run. open-proxy sits in between and makes the limit invisible."
         />
 
-        <div className="mt-14 grid items-stretch gap-6 lg:grid-cols-[1fr_auto_1fr]">
+        <div className="mt-10 grid items-stretch gap-6 lg:grid-cols-[1fr_auto_1fr]">
           <Reveal className="h-full">
             <div className="flex h-full flex-col gap-4">
               <div className="flex items-center justify-between">
@@ -199,7 +199,7 @@ export function Compare() {
         </div>
 
         <Reveal delay={0.15}>
-          <div className="mt-12 flex items-center justify-center gap-3 rounded-2xl border border-stone-900/[0.07] bg-white px-6 py-5 shadow-[0_18px_36px_-24px_oklch(0.216_0.008_90/0.2)]">
+          <div className="mt-10 flex items-center justify-center gap-3 rounded-2xl border border-stone-900/[0.07] bg-white px-6 py-5 shadow-[0_18px_36px_-24px_oklch(0.216_0.008_90/0.2)]">
             <Timer className="h-4 w-4 shrink-0 text-emerald-600" strokeWidth={1.8} />
             <p className="text-center text-[15px] font-medium text-stone-700">
               Your application sees one API.{" "}

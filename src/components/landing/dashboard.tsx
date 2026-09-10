@@ -429,7 +429,7 @@ export function DashboardSection() {
   }, [paused]);
 
   return (
-    <section id="dashboard" className="relative overflow-hidden py-24 md:py-32">
+    <section id="dashboard" className="relative overflow-hidden py-14 md:py-20">
       <div
         aria-hidden
         className="absolute right-[-10%] top-24 h-[420px] w-[420px] rounded-full bg-emerald-100/50 blur-[130px]"
@@ -444,7 +444,7 @@ export function DashboardSection() {
 
         <Reveal delay={0.15}>
           <div
-            className="mt-14"
+            className="mt-10"
             onMouseEnter={() => setPaused(true)}
             onMouseLeave={() => setPaused(false)}
           >
@@ -533,7 +533,7 @@ export function DashboardSection() {
 
 export function PrivacyBand() {
   return (
-    <section className="relative border-y border-stone-900/[0.07] bg-stone-900 py-20 md:py-24">
+    <section className="relative border-y border-stone-900/[0.07] bg-stone-900 py-14 md:py-20">
       <div
         aria-hidden
         className="absolute left-1/2 top-0 h-[300px] w-[600px] -translate-x-1/2 rounded-full bg-emerald-500/10 blur-[110px]"

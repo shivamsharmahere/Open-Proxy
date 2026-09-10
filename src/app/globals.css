@@ -434,7 +434,11 @@
 
 /* smooth anchor scrolling (docs TOC + landing anchors) */
 html {
+  position: relative; /* framer useScroll(target) dev-warning expects a non-static container */
   scroll-behavior: smooth;
+}
+section[id] {
+  scroll-margin-top: 96px;
 }
 @media (prefers-reduced-motion: reduce) {
   html {

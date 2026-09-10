@@ -51,7 +51,7 @@ export function Quickstart() {
   };
 
   return (
-    <section id="quickstart" className="relative py-24 md:py-32">
+    <section id="quickstart" className="relative py-14 md:py-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <SectionHeading
           eyebrow="deploy in minutes"
@@ -59,7 +59,7 @@ export function Quickstart() {
           sub="No sign-up, no control plane, no vendor. The proxy runs on your machine, your VPS or your PaaS — and the first-run wizard does the rest."
         />
 
-        <div className="mt-14 grid items-start gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:gap-14">
+        <div className="mt-10 grid items-start gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:gap-14">
           {/* terminal */}
           <Reveal>
             <div className="lg:sticky lg:top-28">

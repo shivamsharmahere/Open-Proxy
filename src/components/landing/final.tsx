@@ -1,7 +1,8 @@
 "use client";
 
+import { useRef } from "react";
 import { ArrowRight, Github, Star } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useScroll, useTransform } from "framer-motion";
 import { LogoMark } from "./logo";
 import { Reveal } from "./reveal";
 import { StarCount } from "./github-stars";
@@ -12,8 +13,8 @@ import { StarCount } from "./github-stars";
 
 export function FinalCta() {
   return (
-    <section className="relative overflow-hidden px-4 pb-24 pt-10 sm:px-6 md:pb-32">
-      <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[2rem] bg-stone-900 px-6 py-20 text-center shadow-[0_56px_110px_-40px_oklch(0.216_0.008_90/0.55)] md:py-28">
+    <section id="start" className="relative overflow-hidden px-4 pb-14 pt-6 sm:px-6 md:pb-20">
+      <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[2rem] bg-stone-900 px-6 py-16 text-center shadow-[0_56px_110px_-40px_oklch(0.216_0.008_90/0.55)] md:py-24">
         {/* decor */}
         <div
           aria-hidden
@@ -137,8 +138,8 @@ const COLS = [
 
 export function Footer() {
   return (
-    <footer className="mt-auto border-t border-stone-900/[0.07] bg-white/60">
-      <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
+    <footer className="mt-auto overflow-hidden border-t border-stone-900/[0.07] bg-white/60">
+      <div className="mx-auto max-w-6xl px-4 pt-12 sm:px-6">
         <div className="grid gap-10 md:grid-cols-[1.3fr_1fr_1fr_1fr]">
           <div className="flex flex-col gap-4">
             <a href="#top" className="flex items-center gap-2.5">
@@ -183,8 +184,12 @@ export function Footer() {
             </div>
           ))}
         </div>
+      </div>
 
-        <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-stone-900/[0.06] pt-6 sm:flex-row">
+      <Watermark />
+
+      <div className="mx-auto max-w-6xl px-4 pb-7 sm:px-6">
+        <div className="mt-2 flex flex-col items-center justify-between gap-3 border-t border-stone-900/[0.06] pt-5 sm:flex-row">
           <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-stone-400">
             open-proxy — one proxy, every provider, zero 429s
           </p>
@@ -194,5 +199,28 @@ export function Footer() {
         </div>
       </div>
     </footer>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* giant end-of-page wordmark — rises into place as you reach the end  */
+/* ------------------------------------------------------------------ */
+
+function Watermark() {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start end", "end end"],
+  });
+  const y = useTransform(scrollYProgress, [0, 1], ["34%", "0%"]);
+
+  return (
+    <div ref={ref} aria-hidden className="relative mt-10 select-none overflow-hidden px-1 pb-1">
+      <motion.div style={{ y }} className="pointer-events-none">
+        <span className="block whitespace-nowrap bg-gradient-to-b from-stone-300 via-stone-200 to-stone-100/20 bg-clip-text text-center text-[17.5vw] font-semibold leading-none tracking-[-0.045em] text-transparent">
+          open-proxy
+        </span>
+      </motion.div>
+    </div>
   );
 }

@@ -1,4 +1,5 @@
 import { Nav } from "@/components/landing/nav";
+import { ScrollRail } from "@/components/landing/scroll-rail";
 import { Hero } from "@/components/landing/hero";
 import { Marquee } from "@/components/landing/marquee";
 import { Compare } from "@/components/landing/compare";
@@ -17,6 +18,7 @@ export default function Home() {
     <>
       <div className="grain-overlay" aria-hidden />
       <Nav />
+      <ScrollRail />
       <main className="flex-1">
         <Hero />
         <Marquee />

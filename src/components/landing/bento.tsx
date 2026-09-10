@@ -292,7 +292,7 @@ function Card({
 
 export function Bento() {
   return (
-    <section id="features" className="relative py-24 md:py-32">
+    <section id="features" className="relative py-14 md:py-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <SectionHeading
           eyebrow="outcomes, not plumbing"
@@ -300,7 +300,7 @@ export function Bento() {
           sub="Pacing, queueing, affinity, failover, governing, heartbeats and caching — seven moving parts working together behind one endpoint, so rate limits become your problem exactly zero times."
         />
 
-        <div className="mt-14 grid grid-cols-1 gap-5 md:grid-cols-12">
+        <div className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-12">
           <Card
             icon={Gauge}
             title="Rate-limit aware"

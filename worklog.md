@@ -205,3 +205,52 @@ Verification:
 
 Stage Summary:
 - DONE. Both GitHub CTAs now say "Star on GitHub" with the GitHub logo + live star-count chip (graceful fallback). Files: github-stars.tsx (new), hero.tsx, final.tsx.
+
+---
+Task ID: 9
+Agent: main (Super Z)
+Task: Reduce excessive vertical spacing between landing sections ("the space between the different sections is too much")
+
+Work Log:
+- Audit: every landing section used py-24 md:py-32 (96/128px per side -> 192-256px dead space between adjacent sections)
+- Reduced uniformly to py-14 md:py-20 (56/80px -> 112/160px gaps) across: quickstart, bento, endpoint, pool, compare, audience, dashboard (DashboardSection + PrivacyBand), loadtest, infra (Infra + Security)
+- Internal header->grid margins tightened mt-14 -> mt-10 (7 files), compare bottom strip mt-12 -> mt-10
+- FinalCta: outer pb-24 pt-10 md:pb-32 -> pb-14 pt-6 md:pb-20; dark card py-20 md:py-28 -> py-16 md:py-24
+- Hero top padding (pt-32 md:pt-40) untouched — it clears the fixed nav
+- Added section[id] { scroll-margin-top: 96px } in globals.css so anchor/rail jumps land below the glass nav (Turbopack initially served stale CSS; verified after real content change invalidated cache)
+
+Verification:
+- bun run lint: clean; GET / and /docs 200
+- Computed paddings on desktop: how/features/dashboard/quickstart all 80px/80px (was 128px); mobile how 56px (was 96px)
+- Screenshot kept: download/verify-spacing.png
+
+Stage Summary:
+- DONE. Section rhythm tightened ~37% on desktop / ~42% on mobile while keeping premium breathing room. Files: 10 landing components + globals.css.
+
+---
+Task ID: 10
+Agent: main (Super Z)
+Task: Creative desktop-only scroll sidebar with scroll movement + giant FinStocks-style wordmark at the very end of the page
+
+Work Log:
+- New src/components/landing/scroll-rail.tsx (desktop-only, hidden below xl/1280px): fixed right-edge glass pill containing
+  (1) vertical mono "scroll" label, (2) h-56 progress track with base line + spring-smoothed emerald gradient fill (useSpring on useScroll scrollYProgress, origin-top scaleY) + glowing traveler dot chasing the scroll position, (3) 9 scroll-spy nodes (top/how/pool/features/endpoints/dashboard/security/quickstart/start) — active node grows emerald with ring, label chip ("01".."09" + name) ALWAYS visible for the active section and slide-in on hover for others, click smooth-scrolls to the section, (4) live tabular percentage readout, (5) circular jump button: "Skip to end of page" (arrow-down) that flips to rotated "Back to top" past 92% progress
+- Added missing section ids: pool -> #pool, endpoint -> #endpoints, infra Security -> #security, FinalCta -> #start (nav/footer anchors already used top/how/features/dashboard/quickstart)
+- Scroll-spy: rAF-throttled passive scroll listener + offsets measured on mount/resize/+0.8s/+2.2s with MAX_SAFE_INTEGER fallback for missing nodes; reduced-motion respected for all programmatic scrolls
+- Footer (final.tsx): restructured into grid / Watermark / legal bar; new Watermark component — giant "open-proxy" wordmark text-[17.5vw] leading-none tracking-[-0.045em], stone-300->transparent bg-clip-text gradient, whitespace-nowrap full-bleed; scroll-linked parallax via useScroll({ target, offset: ["start end","end end"] }) + useTransform y 34%->0% inside overflow-hidden wrapper, so it rises into place as the user reaches the end (movement on scroll down AND up); aria-hidden + select-none + pointer-events-none
+- Watermark ships on both / and /docs (shared Footer)
+- Fixed framer dev-only warning "container has a non-static position": window-target useScroll measures against <html>; added position: relative to the html rule in globals.css (no visual impact; production strips the warning anyway)
+- ScrollRail wired into src/app/page.tsx only (after <Nav/>), so /docs keeps its own docs TOC without the rail
+- Headless note: Tailwind v4 gates hover:/group-hover: behind @media (hover: hover) which is false in device-less headless Chrome — hover-only labels were untestable AND invisible during scroll, so active-label-always-visible was added (better UX + matches the "movement while scrolling" ask). Verified via matchMedia probe.
+
+Verification:
+- bun run lint: clean; GET / and /docs 200
+- Rail at 1440px: renders at x=1374 (46x368), pct 0% at top; after scroll-to-#how pct=11% + active "How it works"; label chips flip 01->02->04->09 across the page
+- Node click: "Go to Features" scrolls #features to viewport top with 96px scroll-margin; jump button reaches page end, pct=100%, arrow rotates 180deg, aria-label flips to "Back to top"; back-to-top returns to scrollY 0
+- Watermark: 1432x252 at 1440 (full-bleed), transform translateY(34%) when 600px above bottom -> none at bottom (parallax live); renders on /docs too
+- Mobile 390: rail display:none, watermark scales, sections 56px padding
+- Console: clean after fix; agent-browser errors: none
+- Screenshots kept: verify-rail-top.png, verify-rail-mid.png, verify-watermark.png, verify-mobile-end.png, verify-spacing.png (verify-rail-hover.png superseded by always-on active label)
+
+Stage Summary:
+- DONE. Desktop-only ScrollRail (progress fill + traveling glow dot + scroll-spy nodes with numbered labels + live % + skip-to-end/back-to-top) and the giant end-of-page "open-proxy" wordmark with scroll parallax are live on / (wordmark also on /docs). Spacing task recorded separately as Task 9. Files: scroll-rail.tsx (new), final.tsx, page.tsx, globals.css + section ids in pool/endpoint/infra/dashboard-adjacent components.

@@ -138,7 +138,7 @@ function CodeBlock() {
 
 export function Endpoint() {
   return (
-    <section className="relative py-24 md:py-32">
+    <section id="endpoints" className="relative py-14 md:py-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_1fr] lg:gap-16">
           <div>

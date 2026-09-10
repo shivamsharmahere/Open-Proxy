@@ -64,7 +64,7 @@ function PoolRow({
 
 export function Pool() {
   return (
-    <section className="relative py-24 md:py-32">
+    <section id="pool" className="relative py-14 md:py-20">
       <div
         aria-hidden
         className="absolute left-1/2 top-1/2 h-[480px] w-[720px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-100/40 blur-[130px]"
