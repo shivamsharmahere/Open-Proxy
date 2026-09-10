@@ -68,7 +68,7 @@ export function FinalCta() {
                 />
               </motion.a>
               <motion.a
-                href="https://github.com/miztertea/nim-proxy"
+                href="https://github.com/shivamsharmahere/Open-Proxy"
                 target="_blank"
                 rel="noreferrer"
                 whileHover={{ y: -2 }}
@@ -116,19 +116,19 @@ const COLS = [
   {
     title: "Resources",
     links: [
-      { label: "GitHub", href: "https://github.com/miztertea/nim-proxy" },
-      { label: "Releases", href: "https://github.com/miztertea/nim-proxy/releases" },
-      { label: "Discussions", href: "https://github.com/miztertea/nim-proxy/discussions" },
-      { label: "Contributing", href: "https://github.com/miztertea/nim-proxy/blob/main/CONTRIBUTING.md" },
+      { label: "GitHub", href: "https://github.com/shivamsharmahere/Open-Proxy" },
+      { label: "Releases", href: "https://github.com/shivamsharmahere/Open-Proxy/releases" },
+      { label: "Discussions", href: "https://github.com/shivamsharmahere/Open-Proxy/discussions" },
+      { label: "Contributing", href: "https://github.com/shivamsharmahere/Open-Proxy/blob/main/CONTRIBUTING.md" },
     ],
   },
   {
     title: "Trust",
     links: [
-      { label: "Security policy", href: "https://github.com/miztertea/nim-proxy/blob/main/SECURITY.md" },
-      { label: "OpenSSF Scorecard", href: "https://scorecard.dev/viewer/?uri=github.com/miztertea/nim-proxy" },
+      { label: "Security policy", href: "https://github.com/shivamsharmahere/Open-Proxy/blob/main/SECURITY.md" },
+      { label: "OpenSSF Scorecard", href: "https://scorecard.dev/viewer/?uri=github.com/shivamsharmahere/Open-Proxy" },
       { label: "Best Practices", href: "https://www.bestpractices.dev/projects/13484" },
-      { label: "MIT License", href: "https://github.com/miztertea/nim-proxy/blob/main/LICENSE" },
+      { label: "MIT License", href: "https://github.com/shivamsharmahere/Open-Proxy/blob/main/LICENSE" },
     ],
   },
 ];

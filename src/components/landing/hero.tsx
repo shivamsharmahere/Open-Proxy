@@ -1182,7 +1182,7 @@ export function Hero() {
                 />
               </a>
               <a
-                href="https://github.com/miztertea/nim-proxy"
+                href="https://github.com/shivamsharmahere/Open-Proxy"
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 rounded-xl border border-stone-900/12 bg-white px-6 py-3.5 text-[15px] font-medium text-stone-800 transition-all hover:-translate-y-0.5 hover:border-stone-900/25 active:translate-y-0"

@@ -169,3 +169,21 @@ Verification:
 
 Stage Summary:
 - DONE. RPM is no longer a fixed identity: the meter starts at the 166 demo pool and keeps ratcheting toward 999 as keys connect; all static claims now say 1000+ / no fixed ceiling. Files touched: hero.tsx, dashboard.tsx.
+
+---
+Task ID: 7
+Agent: main (Super Z)
+Task: Point all GitHub links at the real repo (github.com/shivamsharmahere/Open-Proxy) so users can star/view it
+
+Work Log:
+- Replaced all 11 references to the old placeholder repo (github.com/miztertea/nim-proxy) across nav.tsx, hero.tsx, docs/page.tsx, final.tsx
+- Sub-paths preserved: /releases, /discussions, /blob/main/{CONTRIBUTING,SECURITY,LICENSE}.md, OpenSSF scorecard viewer uri
+- src/content/openproxy-docs.md has no repo URLs (checked, no changes needed)
+
+Verification:
+- rg: no miztertea/nim-proxy refs left in src/
+- bun run lint: clean
+- Browser: collected every a[href*="github.com"] on / (10 links) and /docs (9 links) — all resolve to shivamsharmahere/Open-Proxy with correct sub-paths; no page errors
+
+Stage Summary:
+- DONE. Every GitHub entry point (nav icon, hero button, docs header, final CTA, footer link column) now targets github.com/shivamsharmahere/Open-Proxy.

@@ -103,7 +103,7 @@ export default function DocsPage() {
                 />
               </a>
               <a
-                href="https://github.com/miztertea/nim-proxy"
+                href="https://github.com/shivamsharmahere/Open-Proxy"
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 rounded-xl border border-stone-900/12 bg-white px-5 py-3 text-[14px] font-medium text-stone-800 transition-all hover:-translate-y-0.5 hover:border-stone-900/25 active:translate-y-0"

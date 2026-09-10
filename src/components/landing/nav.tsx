@@ -90,7 +90,7 @@ export function Nav({
 
         <div className="flex items-center gap-2">
           <a
-            href="https://github.com/miztertea/nim-proxy"
+            href="https://github.com/shivamsharmahere/Open-Proxy"
             target="_blank"
             rel="noreferrer"
             aria-label="View open-proxy on GitHub"
