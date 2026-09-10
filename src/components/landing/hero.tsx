@@ -70,11 +70,11 @@ const EVENTS = [
   { text: "POST /v1/chat/completions → nim-2 · 200 · streamed 1.2k tok", tone: "ok" },
   { text: "failover: nim-1 → openrouter-1 · affinity kept", tone: "info" },
   { text: "POST /v1/chat/completions → others-3 · 200 OK · 47ms", tone: "ok" },
-  { text: "pace: 166 rpm budget shared · 0 requests dropped", tone: "info" },
+  { text: "pace: pooled rpm budget shared · 0 requests dropped", tone: "info" },
 ] as const;
 
 const STATS = [
-  { icon: Zap, v: "166 RPM", l: "pooled throughput" },
+  { icon: Zap, v: "1000+ RPM", l: "pooled throughput" },
   { icon: Layers, v: "12 keys", l: "across 4 upstreams" },
   { icon: Timer, v: "+1.8ms", l: "p95 pacing overhead" },
   { icon: ShieldCheck, v: "MIT", l: "self-hosted · fail-closed" },
@@ -355,15 +355,19 @@ const CONTACT_CROSSINGS = CLIENTS.map((_, i) => {
 /* ------------------------------------------------------------------ */
 /* shared live rpm meter — one store drives every live readout          */
 /* (desktop hub, mobile hub, mobile stream badge) so they never         */
-/* disagree. counts 0 -> 166 on first reveal, then breathes around      */
-/* capacity and surges the moment a client powers up on the stream      */
+/* disagree. counts 0 -> 166 on first reveal, then keeps climbing as    */
+/* keys connect, breathes around the current ceiling and surges when    */
+/* a client powers up on the stream                                     */
 /* ------------------------------------------------------------------ */
 
-const RPM_CAPACITY = 166;
+const RPM_START = 166; /* demo pool — the meter keeps climbing as keys connect */
+const RPM_MAX = 999;
 
 let rpmValue = 0;
+let rpmCap = RPM_START; /* current pooled ceiling; grows as keys connect */
 let rpmArmed = false;
 let rpmDriftT: ReturnType<typeof setTimeout> | undefined;
+let rpmGrowT: ReturnType<typeof setTimeout> | undefined;
 const rpmSubs = new Set<(v: number) => void>();
 
 function emitRpm() {
@@ -386,10 +390,13 @@ function armRpm() {
   const t0 = performance.now();
   const step = (now: number) => {
     const p = Math.min(1, (now - t0) / D);
-    rpmValue = Math.round(RPM_CAPACITY * (1 - Math.pow(1 - p, 3)));
+    rpmValue = Math.round(RPM_START * (1 - Math.pow(1 - p, 3)));
     emitRpm();
     if (p < 1) requestAnimationFrame(step);
-    else driftTick(900);
+    else {
+      driftTick(900);
+      growTick(7000);
+    }
   };
   requestAnimationFrame(step);
 }
@@ -399,22 +406,37 @@ function driftTick(delay: number) {
   if (rpmDriftT !== undefined) return;
   rpmDriftT = setTimeout(() => {
     rpmDriftT = undefined;
-    const pull = Math.round((RPM_CAPACITY - rpmValue) * 0.45);
+    const pull = Math.round((rpmCap - rpmValue) * 0.45);
     const noise = Math.floor(Math.random() * 5) - 2; /* -2..+2 */
     rpmValue = Math.max(
-      RPM_CAPACITY - 6,
-      Math.min(RPM_CAPACITY + 2, rpmValue + pull + noise)
+      rpmCap - 6,
+      Math.min(rpmCap + 2, rpmValue + pull + noise)
     );
     emitRpm();
     driftTick(1500 + Math.random() * 1300);
   }, delay);
 }
 
+/* keys/providers get connected over time — the pooled ceiling ratchets up */
+function growTick(delay: number) {
+  if (rpmGrowT !== undefined) return;
+  rpmGrowT = setTimeout(() => {
+    rpmGrowT = undefined;
+    if (rpmCap < RPM_MAX) {
+      const step = rpmCap > 900 ? 1 : 2 + Math.floor(Math.random() * 4);
+      rpmCap = Math.min(RPM_MAX, rpmCap + step);
+      rpmValue = rpmCap; /* pool grew — meter steps up to its new ceiling */
+      emitRpm();
+    }
+    growTick(8000 + Math.random() * 6000);
+  }, delay);
+}
+
 /* power-up surge — a served request kicks the meter, drift decays it back */
 function surgeRpm() {
-  if (!rpmArmed || rpmValue < RPM_CAPACITY - 20) return; /* still counting up */
+  if (!rpmArmed || rpmValue < RPM_START - 20) return; /* still counting up */
   rpmValue = Math.min(
-    RPM_CAPACITY + 5,
+    rpmCap + 5,
     rpmValue + 1 + Math.floor(Math.random() * 2)
   );
   emitRpm();
@@ -976,12 +998,12 @@ function RpmCard() {
         </span>
         <div className="pb-1.5">
           <p className="tnum font-mono text-sm font-semibold text-emerald-700">
-            <Counter to={166} /> RPM pooled
+            <Counter to={1000} suffix="+" /> rpm at scale
           </p>
           <p className="text-[12px] leading-snug text-stone-500">
-            effective ceiling for
+            no fixed ceiling — the pool
             <br />
-            every connected agent
+            grows with every key you add
           </p>
         </div>
       </div>
@@ -1007,7 +1029,7 @@ function RpmCard() {
             <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
           </linearGradient>
         </defs>
-        {/* 166 ceiling */}
+        {/* demo-pool ceiling reference */}
         <line
           x1="5"
           x2="295"
@@ -1027,7 +1049,7 @@ function RpmCard() {
           className="font-mono"
           letterSpacing="0.08em"
         >
-          166 CEILING
+          POOL CEILING
         </text>
         <motion.path
           d={spark.area}
@@ -1076,7 +1098,8 @@ function RpmCard() {
         ))}
       </div>
       <p className="mt-5 border-t border-stone-900/[0.07] pt-3.5 font-mono text-[10.5px] leading-relaxed text-stone-400">
-        80 + 40 + 16 + 50 = <span className="font-semibold text-stone-600">166 RPM</span>{" "}
+        80 + 40 + 16 + 50 — a demo pool.{" "}
+        <span className="font-semibold text-stone-600">stack keys and it scales past 1000 rpm</span>{" "}
         — every key keeps its own limit. your agents never see one.
       </p>
     </div>

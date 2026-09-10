@@ -372,7 +372,7 @@ const TABS = [
                 <Counter to={71} />%
               </p>
               <p className="tnum font-mono text-[10.5px] text-stone-400">
-                118 / 166 rpm
+                312 / 440 rpm
               </p>
             </div>
             <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-stone-100">
