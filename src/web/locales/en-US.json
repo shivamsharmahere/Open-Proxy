@@ -1613,8 +1613,9 @@
       "hash": "78a648d8"
     },
     "settings.upstream.help": {
-      "en": "Each group is an OpenAI-compatible API with its own keys and rate limits. A group with an empty model list serves any model. The stream_options toggle controls whether the proxy asks the provider to include token usage in streaming responses — disable it for providers that reject or ignore this option.",
-      "desc": "Providers card explainer."
+      "en": "Each group is an OpenAI-compatible API with its own keys and rate limits. A group with an empty model list serves any model.",
+      "desc": "Providers card explainer.",
+      "hash": "008cded6"
     },
     "settings.upstream.key_count.few": {
       "en": "{n} API keys",
@@ -1685,14 +1686,6 @@
       "en": "Enable group. Rate-limit state is preserved.",
       "desc": "Title for a disabled group's enable toggle.",
       "hash": "a40b6cb8"
-    },
-    "settings.upstream.stream_options.enable": {
-      "en": "Enable stream_options injection. Tells the provider to include token usage in streaming responses.",
-      "desc": "Title for enabling stream_options on a provider that doesn't support it."
-    },
-    "settings.upstream.stream_options.disable": {
-      "en": "Disable stream_options injection. Use this when the provider rejects or ignores stream_options.",
-      "desc": "Title for disabling stream_options on a provider."
     },
     "settings.upstream.url_placeholder": {
       "en": "https://api.example.com/v1",

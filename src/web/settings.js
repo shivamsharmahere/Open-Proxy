@@ -162,7 +162,6 @@ function renderAccess() {
             </div>` : ''}
           </div>
           ${admin ? `<button class="tog" type="button" aria-pressed="${!!g.enabled}" data-uptog="${i}" data-i18n-attr="title:${g.enabled ? 'settings.upstream.toggle.disable' : 'settings.upstream.toggle.enable'},aria-label:${g.enabled ? 'settings.upstream.toggle.disable' : 'settings.upstream.toggle.enable'}"></button>` : ''}
-          ${admin ? `<button class="tog${g.supports_stream_options === false ? '' : ' active'}" type="button" aria-pressed="${g.supports_stream_options !== false}" data-upsog="${i}" data-i18n-attr="title:${g.supports_stream_options !== false ? 'settings.upstream.stream_options.disable' : 'settings.upstream.stream_options.enable'},aria-label:${g.supports_stream_options !== false ? 'settings.upstream.stream_options.disable' : 'settings.upstream.stream_options.enable'}"></button>` : ''}
           ${admin && g.name !== 'nvidia' ? `<button class="dbtn icon" data-updel="${i}" data-i18n-attr="title:settings.upstream.remove">${TRASH}</button>` : ''}
         </div>`;
       }).join('') || '<div class="empty" data-i18n="settings.upstream.empty"></div>'}</div>
@@ -305,13 +304,6 @@ function renderAccess() {
     const g = groups[+el.dataset.uptog];
     try {
       await sPost('/api/settings/upstreams', { set: { name: g.name, enabled: !g.enabled } });
-      await loadSettings();
-    } catch (e) { note('up-err', e.message); }
-  });
-  for (const el of body.querySelectorAll('[data-upsog]')) el.addEventListener('click', async () => {
-    const g = groups[+el.dataset.upsog];
-    try {
-      await sPost('/api/settings/upstreams', { set: { name: g.name, supports_stream_options: g.supports_stream_options === false } });
       await loadSettings();
     } catch (e) { note('up-err', e.message); }
   });
