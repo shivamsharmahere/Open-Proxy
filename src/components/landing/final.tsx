@@ -106,10 +106,11 @@ const COLS = [
   {
     title: "Product",
     links: [
-      { label: "How it works", href: "#how" },
-      { label: "Features", href: "#features" },
-      { label: "Dashboard", href: "#dashboard" },
-      { label: "Deploy", href: "#quickstart" },
+      { label: "Docs", href: "/docs" },
+      { label: "How it works", href: "/#how" },
+      { label: "Features", href: "/#features" },
+      { label: "Dashboard", href: "/#dashboard" },
+      { label: "Deploy", href: "/#quickstart" },
     ],
   },
   {

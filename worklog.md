@@ -77,3 +77,28 @@ Verification:
 
 Stage Summary:
 - DONE. Overlap eliminated (166 lives inside the hub now); strip-contact power-up effect shipped and animation-clock synced. Files touched: hero.tsx, globals.css
+
+---
+Task ID: 4
+Agent: main (Super Z)
+Task: Add the uploaded openproxy-docs.md as a Docs page on the site (/docs)
+
+Work Log:
+- Copied upload/openproxy-docs.md -> src/content/openproxy-docs.md (read at build time; page is fully static)
+- Built src/lib/docs-parser.ts: minimal markdown block parser (headings, fenced code, tables, callout quotes, ordered/unordered lists with one nesting level, paragraphs, slugs) -> section model {id,title,blocks,subs} for TOC
+- Bugs fixed in parser: (1) infinite loop — h1 title line fell through paragraph branch without consuming, hung the dev server event loop (had to kill + restart next-server via double-fork orphan pattern since sandbox reaps children between tool calls); (2) "## " prefix leaked into titles (regex #{3,4} -> #{2,4}); (3) preamble tagline quote became a phantom "Overview" section (now skip everything before first h2)
+- Built src/components/docs/docs-ui.tsx (client): CodeBlock — dark console panel, language label, traffic dots, line-level tinting (comments/toml sections/json+yaml keys), copy button with legacy execCommand fallback; DocsToc — two-level sticky TOC with rAF scroll-spy (active = last heading top <= 112px)
+- Built src/components/docs/docs-content.tsx (server): inline markdown renderer (bold/code/links/bare-url linkify), callouts (emerald note / amber important-caveat-limitation-key-distinction), styled tables, numbered/bulleted lists, h3 hover anchors, numbered section headers
+- Created src/app/docs/page.tsx: premium header band (blueprint grid + aurora, eyebrow, h1, tagline, chips, Quickstart/GitHub CTAs), lg sidebar + mobile <details> TOC, closing quickstart CTA card, Footer; metadata/og; fs read at module scope
+- Nav upgraded for cross-route use: props homeHref/linkPrefix/ctaHref + usePathname active state; "Docs" link added (desktop + mobile menu); footer Product column got Docs link + absolute /# anchors
+- globals.css: html smooth scroll + prefers-reduced-motion guard
+- Verified: copy button flips to "copied" via real CDP mouse click (headless clipboard needs activation); TOC click scrolls with correct 112px scroll-margin; scroll-spy tracks sections + subsections; tables/callouts/code blocks render on desktop + mobile
+
+Verification:
+- bun run lint: clean
+- Parser standalone test: 13 sections, 24 code blocks, 6 tables, 7 callouts, correct slugs
+- agent-browser: desktop 1440 + mobile 390 walkthroughs of /docs, TOC nav, copy button, mobile contents accordion; landing nav intact; no console/page errors
+- Note: dev server was restarted detached (setsid double-fork) after the parser infinite-loop wedge
+
+Stage Summary:
+- DONE. Docs page live at /docs; files: src/content/openproxy-docs.md, src/lib/docs-parser.ts, src/components/docs/{docs-ui,docs-content}.tsx, src/app/docs/page.tsx, nav.tsx, final.tsx, globals.css

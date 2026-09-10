@@ -431,3 +431,13 @@
 .chip-shake {
   animation: opx-shake 0.45s ease-in-out;
 }
+
+/* smooth anchor scrolling (docs TOC + landing anchors) */
+html {
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Github, Menu, X } from "lucide-react";
+import { ArrowRight, BookOpen, Github, Menu, X } from "lucide-react";
 import { LogoMark } from "./logo";
 import { cn } from "@/lib/utils";
 
@@ -11,11 +12,25 @@ const LINKS = [
   { href: "#features", label: "Features" },
   { href: "#dashboard", label: "Dashboard" },
   { href: "#quickstart", label: "Deploy" },
+  { href: "/docs", label: "Docs" },
 ];
 
-export function Nav() {
+export function Nav({
+  homeHref = "#top",
+  linkPrefix = "",
+  ctaHref = "#quickstart",
+}: {
+  homeHref?: string;
+  linkPrefix?: string;
+  ctaHref?: string;
+}) {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const onDocs = pathname === "/docs";
+
+  const resolve = (href: string) =>
+    href.startsWith("/") ? href : `${linkPrefix}${href}`;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 14);
@@ -38,7 +53,7 @@ export function Nav() {
         )}
         aria-label="Main navigation"
       >
-        <a href="#top" className="group flex items-center gap-2.5">
+        <a href={homeHref} className="group flex items-center gap-2.5">
           <LogoMark className="h-8 w-8 transition-transform duration-500 group-hover:rotate-[8deg]" />
           <span className="text-[15px] font-semibold tracking-tight text-stone-900">
             open-proxy
@@ -49,15 +64,28 @@ export function Nav() {
         </a>
 
         <div className="hidden items-center gap-1 md:flex">
-          {LINKS.map((l) => (
-            <a
-              key={l.href}
-              href={l.href}
-              className="rounded-lg px-3.5 py-2 text-[13.5px] font-medium text-stone-500 transition-colors hover:bg-stone-900/[0.045] hover:text-stone-900"
-            >
-              {l.label}
-            </a>
-          ))}
+          {LINKS.map((l) => {
+            const href = resolve(l.href);
+            const active = l.href === "/docs" && onDocs;
+            return (
+              <a
+                key={l.href}
+                href={href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13.5px] font-medium transition-colors",
+                  active
+                    ? "bg-emerald-600/[0.08] text-emerald-800"
+                    : "text-stone-500 hover:bg-stone-900/[0.045] hover:text-stone-900"
+                )}
+              >
+                {l.label === "Docs" ? (
+                  <BookOpen className="h-3.5 w-3.5" strokeWidth={1.8} />
+                ) : null}
+                {l.label}
+              </a>
+            );
+          })}
         </div>
 
         <div className="flex items-center gap-2">
@@ -71,7 +99,7 @@ export function Nav() {
             <Github className="h-4 w-4" strokeWidth={1.8} />
           </a>
           <a
-            href="#quickstart"
+            href={ctaHref}
             className="group hidden items-center gap-1.5 rounded-lg bg-stone-900 px-4 py-2 text-[13.5px] font-medium text-stone-50 transition-all hover:-translate-y-px hover:bg-stone-800 active:translate-y-0 md:inline-flex"
           >
             Get Started
@@ -105,15 +133,23 @@ export function Nav() {
               {LINKS.map((l) => (
                 <a
                   key={l.href}
-                  href={l.href}
+                  href={resolve(l.href)}
                   onClick={() => setOpen(false)}
-                  className="block rounded-xl px-4 py-3 text-[15px] font-medium text-stone-700 hover:bg-stone-50"
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl px-4 py-3 text-[15px] font-medium hover:bg-stone-50",
+                    l.href === "/docs" && onDocs
+                      ? "text-emerald-800"
+                      : "text-stone-700"
+                  )}
                 >
+                  {l.label === "Docs" ? (
+                    <BookOpen className="h-4 w-4 text-emerald-600" strokeWidth={1.8} />
+                  ) : null}
                   {l.label}
                 </a>
               ))}
               <a
-                href="#quickstart"
+                href={ctaHref}
                 onClick={() => setOpen(false)}
                 className="mt-1 flex items-center justify-center gap-2 rounded-xl bg-stone-900 px-4 py-3 text-[15px] font-medium text-stone-50"
               >
