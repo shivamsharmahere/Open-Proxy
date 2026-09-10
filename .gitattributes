@@ -1,0 +1,18 @@
+# Normalize line endings to LF in the repo and in checkouts (matches
+# .editorconfig), so Windows contributors can't introduce CRLF churn.
+* text=auto eol=lf
+
+# Binary assets — never diff, never normalize.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+
+# Fuzz seed inputs are exact bytes; eol-normalizing them would corrupt the
+# corpus.
+fuzz/seeds/** binary
+
+# openapi.json is generated from the handlers (UPDATE_OPENAPI=1 cargo test
+# --test openapi) and CI fails on drift — collapse it in review, and never
+# hand-edit it.
+openapi.json linguist-generated=true

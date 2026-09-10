@@ -1,0 +1,41 @@
+{
+  "client_keys": [
+    {
+      "last4": "abcd",
+      "name": "fixture-client",
+      "owner": "fixture-user"
+    }
+  ],
+  "disabled_models": [],
+  "locale": "en-US",
+  "mode": "keyed",
+  "nim_keys": [
+    {
+      "cooldown_ms": 0,
+      "enabled": true,
+      "fingerprint": "f17e0001",
+      "guarded": false,
+      "in_window": 1,
+      "lane": 0,
+      "last4": "wxyz",
+      "owner": "fixture-user",
+      "rpm": 40,
+      "upstream": "nvidia"
+    }
+  ],
+  "pool": {
+    "capacity_rpm": 80,
+    "enabled": 2
+  },
+  "role": "user",
+  "upstreams": [
+    {
+      "base_url": "https://integrate.api.nvidia.com",
+      "enabled": true,
+      "keys": 2,
+      "models": [],
+      "name": "nvidia"
+    }
+  ],
+  "username": "fixture-user"
+}

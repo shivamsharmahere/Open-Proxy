@@ -1,0 +1,82 @@
+[package]
+name = "open-proxy"
+version = "0.6.6"
+edition = "2021"
+description = "Rate-limit-aware OpenAI-compatible multi-upstream proxy with model routing and multi-key load balancing"
+license = "MIT"
+repository = "https://github.com/shivamsharmahere/Open-Proxy"
+homepage = "https://github.com/shivamsharmahere/Open-Proxy"
+readme = "README.md"
+# Measured with `cargo msrv find` and verified with --all-targets; CI's
+# `msrv` job builds with exactly this toolchain so the claim can't rot.
+rust-version = "1.87"
+keywords = ["proxy", "openai", "rate-limiting", "nvidia", "llm"]
+categories = ["network-programming", "web-programming::http-server"]
+
+# `--cfg fuzzing` is set by cargo-fuzz for the whole build graph; teach the
+# unexpected_cfgs lint about it so -D warnings stays clean in normal builds.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fuzzing)"] }
+
+[dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "time", "sync"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "gzip"] }
+# derive adds zero new crates: the proc-macro stack is already in the tree.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+metrics = "0.24"
+metrics-exporter-prometheus = { version = "0.18", default-features = false }
+bytes = "1"
+futures-util = "0.3"
+tokio-stream = "0.1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dotenvy = "0.15"
+# Auth: HMAC-signed session cookies + constant-time secret comparison.
+hmac = "0.12"
+sha2 = "0.10"
+subtle = "2"
+getrandom = "0.2"
+# OpenAPI: the response types carry `ToSchema` and the handlers carry
+# `#[utoipa::path]`, so openapi.json is generated from the code that serves
+# the requests. Pinned exactly (project convention); no served UI — the
+# scalar/redoc crates pull JS from a CDN the dashboard CSP forbids.
+utoipa = "=5.5.0"
+
+[dev-dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "json"] }
+serde_json = "1"
+bytes = "1"
+futures-util = "0.3"
+# The e2e harness hashes client secrets when writing store fixtures.
+sha2 = "0.10"
+
+# PBKDF2 password hashing runs 600k HMAC-SHA256 iterations. At opt-level 0
+# every dev-build login (and the e2e auth suite) would take multiple seconds
+# — the generic HMAC glue monomorphizes into this crate, so the hashing
+# chain's own opt level isn't enough. Level 1 keeps debuginfo and fast
+# builds while making hashing near release speed.
+[profile.dev]
+opt-level = 1
+[profile.dev.package.sha2]
+opt-level = 3
+[profile.dev.package.hmac]
+opt-level = 3
+[profile.dev.package.digest]
+opt-level = 3
+[profile.dev.package.block-buffer]
+opt-level = 3
+[profile.dev.package.generic-array]
+opt-level = 3
+
+[profile.release]
+lto = true
+strip = true
+# Optimize for speed (the proxy's job): re-enables inlining/vectorization on the
+# JSON-parse and SSE-scan hot paths. lto + strip + codegen-units=1 keep the size
+# growth modest against opt-level="z".
+opt-level = 3
+codegen-units = 1

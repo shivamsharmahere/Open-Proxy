@@ -1,0 +1,581 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+# Least privilege by default; jobs opt into more only if they need it.
+permissions:
+  contents: read
+
+# A new push to the same ref supersedes the running CI for it (but never
+# cancel main's post-merge runs — their results gate releases).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  changes:
+    name: change routing
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      stable: ${{ steps.filter.outputs.stable }}
+      presentation: ${{ steps.filter.outputs.presentation }}
+      coverage: ${{ steps.filter.outputs.coverage }}
+      docker: ${{ steps.filter.outputs.docker }}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - name: Route changed paths
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: step-security/paths-filter@9098a7821b83402dbe267c0c801e7d580ce74f92 # v4.0.2
+        with:
+          predicate-quantifier: every
+          filters: |
+            stable:
+              - '**'
+              - '!**/*.md'
+              - '!docs/**'
+              - '!knowledge/**'
+              - '!.github/ISSUE_TEMPLATE/**'
+              - '!.github/CODEOWNERS'
+              - '!scripts/check_agent_guide.py'
+              - '!fuzz/**'
+              - '!deny.toml'
+              - '!.github/dependabot.yml'
+              - '!Dockerfile'
+              - '!.dockerignore'
+              - '!docker-compose*.yml'
+              - '!src/web/**'
+              - '!scripts/render_check.js'
+              - '!scripts/formatter_fixture.js'
+              - '!scripts/check_i18n.py'
+              - '!scripts/locale_v1.py'
+              - '!scripts/gen_pseudolocale.py'
+              - '!tests/fixtures/locales/**'
+              - '!tests/fixtures/formatters-en-US.txt'
+            presentation:
+              - '**'
+              - '!**/*.md'
+              - '!docs/**'
+              - '!knowledge/**'
+              - '!.github/ISSUE_TEMPLATE/**'
+              - '!.github/CODEOWNERS'
+              - '!scripts/check_agent_guide.py'
+              - '!fuzz/**'
+              - '!deny.toml'
+              - '!.github/dependabot.yml'
+              - '!Cargo.toml'
+              - '!Cargo.lock'
+              - '!rust-toolchain.toml'
+              - '!Dockerfile'
+              - '!.dockerignore'
+              - '!docker-compose*.yml'
+              - '!src/dispatch.rs'
+              - '!src/governor.rs'
+              - '!src/history.rs'
+              - '!src/history/**'
+              - '!src/lib.rs'
+              - '!src/observation.rs'
+              - '!src/pool.rs'
+              - '!openapi.json'
+              - '!tests/e2e.rs'
+              - '!tests/openapi.rs'
+              - '!tests/support/**'
+              - '!tests/fixtures/api/**'
+              - '!tests/fixtures/history-v1/**'
+              - '!tests/fixtures/nim-observations/**'
+            coverage:
+              - '**'
+              - '!**/*.md'
+              - '!docs/**'
+              - '!knowledge/**'
+              - '!.github/ISSUE_TEMPLATE/**'
+              - '!.github/CODEOWNERS'
+              - '!scripts/check_agent_guide.py'
+              - '!fuzz/**'
+              - '!deny.toml'
+              - '!.github/dependabot.yml'
+              - '!Cargo.toml'
+              - '!Cargo.lock'
+              - '!rust-toolchain.toml'
+              - '!Dockerfile'
+              - '!.dockerignore'
+              - '!docker-compose*.yml'
+              - '!src/web/**'
+              - '!scripts/render_check.js'
+              - '!scripts/formatter_fixture.js'
+              - '!scripts/check_i18n.py'
+              - '!scripts/locale_v1.py'
+              - '!scripts/gen_pseudolocale.py'
+              - '!tests/fixtures/locales/**'
+              - '!tests/fixtures/formatters-en-US.txt'
+            docker:
+              - '**'
+              - '!**/*.md'
+              - '!docs/**'
+              - '!knowledge/**'
+              - '!.github/ISSUE_TEMPLATE/**'
+              - '!.github/CODEOWNERS'
+              - '!scripts/check_agent_guide.py'
+              - '!fuzz/**'
+              - '!deny.toml'
+              - '!.github/dependabot.yml'
+              - '!src/web/**'
+              - '!scripts/render_check.js'
+              - '!scripts/formatter_fixture.js'
+              - '!scripts/check_i18n.py'
+              - '!scripts/locale_v1.py'
+              - '!scripts/gen_pseudolocale.py'
+              - '!tests/fixtures/locales/**'
+              - '!tests/fixtures/formatters-en-US.txt'
+
+  check:
+    name: fmt, clippy, tests
+    needs: changes
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - name: Require successful change routing
+        if: needs.changes.result != 'success'
+        run: exit 1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Agent guide contract
+        run: |
+          python3 scripts/check_agent_guide.py --selftest
+          python3 scripts/check_agent_guide.py
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (toolchain via input)
+        if: >-
+          github.event_name != 'pull_request' ||
+          github.base_ref == 'main' ||
+          contains(github.event.pull_request.labels.*.name, 'ci:full') ||
+          needs.changes.outputs.stable == 'true' ||
+          needs.changes.outputs.presentation == 'true'
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        if: >-
+          github.event_name != 'pull_request' ||
+          github.base_ref == 'main' ||
+          contains(github.event.pull_request.labels.*.name, 'ci:full') ||
+          needs.changes.outputs.stable == 'true' ||
+          needs.changes.outputs.presentation == 'true'
+      - name: Format
+        if: >-
+          github.event_name != 'pull_request' ||
+          github.base_ref == 'main' ||
+          contains(github.event.pull_request.labels.*.name, 'ci:full') ||
+          needs.changes.outputs.stable == 'true'
+        run: cargo fmt --check
+      - name: Clippy
+        if: >-
+          github.event_name != 'pull_request' ||
+          github.base_ref == 'main' ||
+          contains(github.event.pull_request.labels.*.name, 'ci:full') ||
+          needs.changes.outputs.stable == 'true'
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Tests (unit + integration)
+        if: >-
+          github.event_name != 'pull_request' ||
+          github.base_ref == 'main' ||
+          contains(github.event.pull_request.labels.*.name, 'ci:full') ||
+          needs.changes.outputs.stable == 'true'
+        run: cargo test
+      # openapi.json is generated from the handlers. Regenerate it here and
+      # fail on any difference, so the committed spec cannot drift from the
+      # code that serves the requests — `cargo test` alone would catch it, but
+      # only if the contributor remembered to commit the regenerated file.
+      - name: OpenAPI spec is in sync
+        if: >-
+          github.event_name != 'pull_request' ||
+          github.base_ref == 'main' ||
+          contains(github.event.pull_request.labels.*.name, 'ci:full') ||
+          needs.changes.outputs.stable == 'true'
+        run: |
+          UPDATE_OPENAPI=1 cargo test --test openapi
+          git diff --exit-code -- openapi.json \
+            || { echo "::error::openapi.json is stale — run 'UPDATE_OPENAPI=1 cargo test --test openapi' and commit it"; exit 1; }
+      - name: Rust-owned UI fixtures are in sync
+        if: >-
+          github.event_name != 'pull_request' ||
+          github.base_ref == 'main' ||
+          contains(github.event.pull_request.labels.*.name, 'ci:full') ||
+          needs.changes.outputs.stable == 'true'
+        # Fixture bytes are serialized from the production response types. The
+        # update command is deliberate; a diff after it catches an omitted
+        # generated fixture in the same way the OpenAPI gate catches its spec.
+        run: |
+          UPDATE_UI_FIXTURES=1 cargo test api::tests::ui_fixtures --lib
+          git add --intent-to-add -- tests/fixtures/ui
+          git diff --exit-code -- tests/fixtures/ui \
+            || { echo "::error::UI fixtures are stale — run 'UPDATE_UI_FIXTURES=1 cargo test api::tests::ui_fixtures --lib' and commit tests/fixtures/ui"; exit 1; }
+      - name: Embedded presentation source boundaries and JS syntax
+        if: >-
+          github.event_name != 'pull_request' ||
+          github.base_ref == 'main' ||
+          contains(github.event.pull_request.labels.*.name, 'ci:full') ||
+          needs.changes.outputs.presentation == 'true'
+        # cargo test asserts on served HTML text and never parses the
+        # JavaScript. These checks also keep executable/style source external
+        # to HTML and reject every external-origin dependency.
+        run: |
+          node scripts/render_check.js --asset-selftest
+          node scripts/render_check.js --assets-only
+          node scripts/render_check.js --served-page-selftest
+          node scripts/render_check.js --catalog-startup-selftest
+          node scripts/render_check.js --syntax-selftest
+          node scripts/render_check.js --syntax-only
+          node scripts/render_check.js --interaction-selftest
+      - name: Formatter output is unchanged
+        if: >-
+          github.event_name != 'pull_request' ||
+          github.base_ref == 'main' ||
+          contains(github.event.pull_request.labels.*.name, 'ci:full') ||
+          needs.changes.outputs.presentation == 'true'
+        # Pins number/duration/date/percent output against a golden fixture.
+        # TZ and locale are fixed because these formatters read the catalog
+        # locale and the system zone; an unpinned run encodes the runner.
+        env:
+          TZ: UTC
+          LC_ALL: en_US.UTF-8
+        run: node scripts/formatter_fixture.js --check
+      - name: i18n lint self-test
+        if: >-
+          github.event_name != 'pull_request' ||
+          github.base_ref == 'main' ||
+          contains(github.event.pull_request.labels.*.name, 'ci:full') ||
+          needs.changes.outputs.presentation == 'true'
+        # Same reason as locale-v1's below, and this one was missing while the
+        # lint shipped three separate blind spots. Every case here is a real
+        # false negative that once reported `i18n OK`.
+        run: python3 scripts/check_i18n.py --selftest
+      - name: i18n catalog and untagged-string lint
+        if: >-
+          github.event_name != 'pull_request' ||
+          github.base_ref == 'main' ||
+          contains(github.event.pull_request.labels.*.name, 'ci:full') ||
+          needs.changes.outputs.presentation == 'true'
+        run: python3 scripts/check_i18n.py
+      - name: locale-v1 self-test
+        if: >-
+          github.event_name != 'pull_request' ||
+          github.base_ref == 'main' ||
+          contains(github.event.pull_request.labels.*.name, 'ci:full') ||
+          needs.changes.outputs.presentation == 'true'
+        # Proves every check can fail before trusting any of them.
+        run: python3 scripts/locale_v1.py --selftest
+      - name: locale-v1 validation
+        if: >-
+          github.event_name != 'pull_request' ||
+          github.base_ref == 'main' ||
+          contains(github.event.pull_request.labels.*.name, 'ci:full') ||
+          needs.changes.outputs.presentation == 'true'
+        run: |
+          python3 scripts/locale_v1.py --update-public
+          git diff --exit-code -- tests/fixtures/locales/public-en-US.json \
+            || { echo "::error::public-en-US.json is stale — run 'python3 scripts/locale_v1.py --update-public' and commit it"; exit 1; }
+          python3 scripts/locale_v1.py --all
+      - name: Pseudolocale is current
+        if: >-
+          github.event_name != 'pull_request' ||
+          github.base_ref == 'main' ||
+          contains(github.event.pull_request.labels.*.name, 'ci:full') ||
+          needs.changes.outputs.presentation == 'true'
+        # en-XA is generated, never hand-edited; a stale one silently stops
+        # testing the strings that changed.
+        run: python3 scripts/gen_pseudolocale.py --check
+      - name: Dashboard renders and survives being driven
+        if: >-
+          github.event_name != 'pull_request' ||
+          github.base_ref == 'main' ||
+          contains(github.event.pull_request.labels.*.name, 'ci:full') ||
+          needs.changes.outputs.presentation == 'true'
+        # `node --check` above proves the scripts parse; this starts the real
+        # binary and requests its served page/assets, replays captured API
+        # payloads through CDP, walks every tab, and hovers every chart. Any
+        # missing/external initial asset or uncaught page error fails. The
+        # bug that motivated it threw on hover and made a healthy proxy report
+        # "Disconnected" — green on every other check in this job.
+        # --escape-probe additionally catches a render helper escaping a
+        # catalog value that was already escaped at load, which is invisible
+        # in English and in en-XA.
+        # Both embedded pages. setup.html was proved by hand three separate
+        # times and the gap written up as "known" each time, which is more work
+        # than one committed check and leaves nothing behind.
+        run: |
+          node scripts/render_check.js
+          node scripts/render_check.js --all-states
+          node scripts/render_check.js --escape-probe
+          node scripts/render_check.js --page setup
+          node scripts/render_check.js --page setup --escape-probe
+          node scripts/render_check.js --page login
+          node scripts/render_check.js --page dashboard --startup-probe bootstrap-failure
+          node scripts/render_check.js --page dashboard --startup-probe delayed-catalog
+          node scripts/render_check.js --page setup --startup-probe catalog-failure
+          node scripts/render_check.js --page setup --startup-probe delayed-catalog
+          node scripts/render_check.js --page login --startup-probe malformed-catalog
+          node scripts/render_check.js --page login --startup-probe delayed-catalog
+          node scripts/render_check.js --page dashboard --startup-probe css-failure
+          node scripts/render_check.js --page setup --startup-probe css-failure
+          node scripts/render_check.js --page login --startup-probe css-failure
+          node scripts/render_check.js --page dashboard --startup-probe app-script-failure
+          node scripts/render_check.js --page dashboard --startup-probe locale-precedence
+          node scripts/render_check.js --page dashboard --startup-probe locale-precedence --precedence-case default
+          node scripts/render_check.js --cleanup-selftest
+
+  coverage:
+    name: coverage
+    needs: changes
+    if: >-
+      needs.changes.result == 'success' &&
+      (github.event_name != 'pull_request' ||
+       github.base_ref == 'main' ||
+       contains(github.event.pull_request.labels.*.name, 'ci:full') ||
+       needs.changes.outputs.coverage == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (toolchain via input)
+        with:
+          toolchain: stable
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - uses: taiki-e/install-action@6a1bd70eaac3c8bdf093356838d7ee09fda951cf # v2.85.5
+        with:
+          tool: cargo-llvm-cov
+      # The e2e suite spawns the real binary; the test harness forwards the
+      # coverage profile path to the child and shuts it down gracefully under
+      # llvm-cov, so subprocess coverage is captured. Gate at 90% lines.
+      - name: Coverage (gate >= 90% lines)
+        run: |
+          {
+            echo '```'
+            cargo llvm-cov --summary-only --fail-under-lines 90
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  msrv:
+    name: msrv
+    needs: changes
+    if: >-
+      needs.changes.result == 'success' &&
+      (github.event_name != 'pull_request' ||
+       github.base_ref == 'main' ||
+       contains(github.event.pull_request.labels.*.name, 'ci:full') ||
+       needs.changes.outputs.stable == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # rust-toolchain.toml (channel = stable) outranks `rustup default`, so
+      # drop it here — this job's whole point is building with the declared
+      # minimum, not stable. Keep this toolchain in lockstep with
+      # `rust-version` in Cargo.toml.
+      - run: rm rust-toolchain.toml
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (toolchain via input)
+        with:
+          toolchain: "1.87"
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - name: Check with the minimum supported Rust
+        run: cargo check --locked --all-targets
+
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          command: check
+
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read # gitleaks lists PR commits on pull_request runs
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # full history for the secret sweep
+          persist-credentials: false
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  lint-workflows:
+    name: workflow lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # zizmor SARIF → code scanning
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # actionlint: schema- and shellcheck-level correctness for the workflow
+      # YAML — any finding is a real bug, so it always gates. Not in
+      # install-action's registry, so it's a pinned release binary verified
+      # against the published checksum (bump version + checksum together).
+      - name: Install actionlint
+        run: |
+          set -euo pipefail
+          curl -fsSLO https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  actionlint_1.7.12_linux_amd64.tar.gz" | sha256sum -c -
+          tar xzf actionlint_1.7.12_linux_amd64.tar.gz actionlint
+      - name: actionlint
+        run: ./actionlint -color
+      - name: Release workflow contract
+        run: python3 scripts/test_release_contract.py
+      - name: Install release Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.2
+      - name: Cosign bundle smoke test
+        run: |
+          set -euo pipefail
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+          printf 'OPENPROXY release signing contract\n' > "$tmp/blob"
+          COSIGN_PASSWORD="" cosign generate-key-pair --output-key-prefix "$tmp/test"
+          COSIGN_PASSWORD="" cosign sign-blob --yes \
+            --key "$tmp/test.key" \
+            --use-signing-config=false \
+            --tlog-upload=false \
+            --bundle "$tmp/blob.sigstore.json" \
+            "$tmp/blob"
+          cosign verify-blob \
+            --key "$tmp/test.pub" \
+            --bundle "$tmp/blob.sigstore.json" \
+            --insecure-ignore-tlog \
+            "$tmp/blob"
+      # zizmor: GitHub-Actions security lint (template injection, cache
+      # poisoning, unpinned actions, …). The action uploads SARIF so every
+      # severity is triageable in code scanning but never fails the build;
+      # the CLI step below is the gate, and only on high-severity findings so
+      # new low-noise rules can't block unrelated PRs.
+      - name: zizmor (SARIF → code scanning)
+        uses: zizmorcore/zizmor-action@6fc4b006235f201fdab3722e17240ab420d580e5 # v0.6.1
+      - uses: taiki-e/install-action@6a1bd70eaac3c8bdf093356838d7ee09fda951cf # v2.85.5
+        with:
+          tool: zizmor@1 # gate pinned to the same major the SARIF action bundles
+      - name: zizmor (gate on high severity)
+        run: zizmor --min-severity high .github/workflows/
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # enables the online audits
+
+  dependency-review:
+    name: dependency review
+    # The action diffs the PR's dependency graph against the base via the
+    # GitHub API — it only makes sense (and only works) on pull requests.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # posts the failure summary as a PR comment
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      # No checkout: the action works purely against the dependency-graph API.
+      # Blocks PRs that introduce crates with known vulnerabilities
+      # (Cargo.lock is covered by the dependency graph). License policy stays
+      # cargo-deny's job — deny.toml is the single source of license truth,
+      # and double-gating against ClearlyDefined's spottier crate data would
+      # only drift.
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: low
+          license-check: false
+          comment-summary-in-pr: on-failure
+
+  docker:
+    name: docker build
+    needs: changes
+    if: >-
+      needs.changes.result == 'success' &&
+      (github.event_name != 'pull_request' ||
+       github.base_ref == 'main' ||
+       contains(github.event.pull_request.labels.*.name, 'ci:full') ||
+       needs.changes.outputs.docker == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - name: Build image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          load: true
+          tags: open-proxy:ci
+          cache-from: type=gha,scope=ci
+          cache-to: type=gha,mode=max,scope=ci
+      - name: Smoke test image
+        run: |
+          # A fresh container boots into setup-required mode (no env config
+          # since v0.6.0); /health is public regardless, and the built-in
+          # HEALTHCHECK must go healthy on it.
+          docker run -d --name smoke -p 8000:8000 open-proxy:ci
+          ok=0
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health > /dev/null 2>&1; then ok=1; break; fi
+            sleep 1
+          done
+          [ "$ok" = 1 ] || { docker logs smoke; exit 1; }
+          # HEALTHCHECK inside the container must also pass.
+          for _ in $(seq 1 30); do
+            s=$(docker inspect -f '{{.State.Health.Status}}' smoke)
+            [ "$s" = healthy ] && exit 0
+            sleep 1
+          done
+          docker logs smoke; exit 1

@@ -1,0 +1,33 @@
+name: Security audit
+
+# A new RUSTSEC advisory can publish between pushes; without a schedule it
+# would only surface at the next commit's CI run. This weekly run checks the
+# existing lockfile against the advisory database — same cargo-deny, same
+# deny.toml as the CI gate, so there is no second policy to maintain. A
+# failure shows as a red scheduled run and GitHub emails the maintainer.
+#
+# Note: GitHub auto-disables scheduled workflows after 60 days without repo
+# activity — acceptable; an inactive repo isn't shipping releases either.
+on:
+  schedule:
+    - cron: "43 6 * * 1" # weekly, Monday 06:43 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  advisories:
+    name: cargo-deny advisories
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          command: check advisories

@@ -1,0 +1,4 @@
+body[hidden] { display:grid !important; }
+#step2, #step3 { display:block !important; }
+#step4, .steps, #to2, #to3, #back1, #back2, #review, #mintwarn, #addkey, #step3 .opt { display:none !important; }
+.noscript-fallback[hidden] { display:block !important; }

@@ -1,0 +1,23 @@
+---
+type: Index
+title: Design decisions
+description: Lightweight ADRs — context, options, choice, consequences.
+---
+
+# Decisions
+
+- [sliding-window-not-token-bucket](sliding-window-not-token-bucket.md)
+- [window-jitter-margin](window-jitter-margin.md)
+- [global-fifo-dispatcher](global-fifo-dispatcher.md)
+- [sticky-affinity-with-spillover](sticky-affinity-with-spillover.md)
+- [sse-heartbeats-for-rate-waits](sse-heartbeats-for-rate-waits.md)
+- [history-retention-days-not-size](history-retention-days-not-size.md)
+- [reset-aware-dashboard-history](reset-aware-dashboard-history.md)
+- [distroless-scratch-image](distroless-scratch-image.md)
+- [usage-injection-auto-fallback](usage-injection-auto-fallback.md)
+- [auth-posture-and-dashboard-password](auth-posture-and-dashboard-password.md)
+- [input-sanitizing-and-xss](input-sanitizing-and-xss.md)
+- [dashboard-operator-console-redesign](dashboard-operator-console-redesign.md)
+- [ui-managed-config-store](ui-managed-config-store.md)
+- [explicit-request-deadline](explicit-request-deadline.md)
+- [dependency-update-cooldown](dependency-update-cooldown.md)

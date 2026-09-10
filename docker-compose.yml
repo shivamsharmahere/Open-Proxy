@@ -1,0 +1,23 @@
+# Runs the image. To build from source instead, layer the dev file:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+services:
+  open-proxy:
+    image: open-proxy:latest
+    build: .
+    restart: unless-stopped
+    ports:
+      # Bound to loopback by default — reachable only from this host. To expose
+      # it, complete the first-run setup wizard (creates the superuser; keep the
+      # /v1 API in keyed mode), put TLS in front (nginx/Caddy or your platform's
+      # edge) with TRUST_PROXY=true, then set PUBLISH_HOST=0.0.0.0 in .env.
+      - "${PUBLISH_HOST:-127.0.0.1}:8000:8000"
+    env_file: .env
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - history:/data
+
+volumes:
+  history:

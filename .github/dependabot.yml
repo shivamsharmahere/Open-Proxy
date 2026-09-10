@@ -1,0 +1,46 @@
+version: 2
+updates:
+  # Rust dependencies. Group minor/patch bumps into one PR to cut noise;
+  # major bumps come as individual PRs so they get real review.
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: weekly
+    cooldown:
+      # Version updates wait through the recommended observation window;
+      # Dependabot security updates bypass cooldowns.
+      default-days: 7
+    open-pull-requests-limit: 5
+    groups:
+      cargo-minor-patch:
+        update-types: ["minor", "patch"]
+    ignore:
+      # Auth crypto/RNG stack is deliberately pinned to the proven-stable
+      # RustCrypto 0.10/0.12 + getrandom 0.2 line: the 0.11/0.13/0.3 bumps are
+      # breaking API changes with no security fix (cargo-deny is clean). Only
+      # take patches here; revisit these majors intentionally.
+      - dependency-name: "hmac"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "sha2"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "getrandom"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+
+  # GitHub Actions used in workflows (keeps pinned versions fresh / SHA-pinnable).
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        update-types: ["minor", "patch"]
+
+  # The Docker build base image (rust:1-alpine).
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7

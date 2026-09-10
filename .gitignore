@@ -1,0 +1,15 @@
+/target
+.env
+/data
+__pycache__/
+.claude/
+.claude-flow/
+.agents/
+skills-lock.json
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+.ruflo/
+.ruvector/

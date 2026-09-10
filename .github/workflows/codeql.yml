@@ -1,0 +1,57 @@
+name: CodeQL
+
+# Static analysis (SAST) for the Rust source. CodeQL's Rust support runs with
+# build-mode: none — the extractor parses source without a cargo build — so
+# the scan stays cheap. Findings land in Security → Code scanning; the weekly
+# cron re-scans unchanged code as new queries ship.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "31 6 * * 2" # weekly, Tuesday 06:31 UTC
+
+# Least privilege by default; the job opts into SARIF upload only.
+permissions:
+  contents: read
+
+# A new push to the same ref supersedes the running scan (but never cancel
+# main's post-merge runs).
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  analyze:
+    name: codeql (rust)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # upload analysis results to code scanning
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Known limitation, not a config problem: the Rust extractor reports
+      # every file "extracted with errors" because macro expansion (even of
+      # std macros like format!) is not fully supported yet — see
+      # github/codeql#19966, #19982, #20659. Verified empirically: adding a
+      # toolchain with rust-src plus `cargo fetch` changes nothing (identical
+      # diagnostics), so no setup steps are cargo-culted here. The queries
+      # still run on all non-macro code; expect the "extracted with errors"
+      # metric to drop as the extractor matures with CodeQL bundle updates.
+      - uses: github/codeql-action/init@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
+        with:
+          languages: rust
+          build-mode: none
+          # Keeps the hard-coded-secret queries on src/** while excluding the
+          # fixture-credential noise in the test/fuzz trees (paths-ignore is
+          # honored for Rust under build-mode: none).
+          config-file: ./.github/codeql/codeql-config.yml
+      - uses: github/codeql-action/analyze@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
+        with:
+          category: "/language:rust"
