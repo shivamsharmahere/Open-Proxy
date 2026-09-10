@@ -414,7 +414,8 @@ fn upstream_request(
     key: &str,
     body: &Bytes,
 ) -> reqwest::RequestBuilder {
-    let url = format!("{base_url}{path_query}");
+    let normalized = crate::config::Upstream::normalize_base_url(base_url);
+    let url = format!("{normalized}{path_query}");
     let mut req = http
         .request(method.clone(), url)
         .header(header::AUTHORIZATION, format!("Bearer {key}"));
