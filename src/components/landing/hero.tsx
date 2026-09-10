@@ -17,6 +17,9 @@ import {
   ShieldCheck,
   ShieldAlert,
   Plus,
+  Copy,
+  Check,
+  Infinity as InfinityIcon,
 } from "lucide-react";
 import { LogoMark } from "./logo";
 import { Counter } from "./reveal";
@@ -93,8 +96,8 @@ function useLiveStats() {
   const [blocked, setBlocked] = useState(331);
   useEffect(() => {
     const a = setInterval(
-      () => setReqs((r) => r + 1 + Math.floor(Math.random() * 3)),
-      1500
+      () => setReqs((r) => r + 1 + Math.floor(Math.random() * 6)),
+      700
     );
     const b = setInterval(
       () => setBlocked((v) => v + (Math.random() < 0.6 ? 1 : 0)),
@@ -106,6 +109,19 @@ function useLiveStats() {
     };
   }, []);
   return { reqs, blocked };
+}
+
+/* always-climbing requests odometer for the hero */
+function useOdometer(start: number) {
+  const [n, setN] = useState(start);
+  useEffect(() => {
+    const t = setInterval(
+      () => setN((v) => v + 2 + Math.floor(Math.random() * 8)),
+      650
+    );
+    return () => clearInterval(t);
+  }, []);
+  return n;
 }
 
 function useEventTicker() {
@@ -289,22 +305,79 @@ function ProxyCore() {
   );
 }
 
-function ClientChip({ name, compact }: { name: string; compact?: boolean }) {
+function ClientChip({
+  name,
+  compact,
+  flash,
+}: {
+  name: string;
+  compact?: boolean;
+  flash?: "served" | "retry" | null;
+}) {
   return (
     <div
       className={cn(
-        "diffuse-card flex items-center gap-1.5 whitespace-nowrap rounded-full border border-emerald-600/15 bg-white px-3 py-1.5",
-        compact ? "text-[10px]" : "text-[11.5px]"
+        "diffuse-card chip-flash flex items-center gap-1.5 whitespace-nowrap rounded-full border border-emerald-600/15 bg-white px-3 py-1.5",
+        compact ? "text-[10px]" : "text-[11.5px]",
+        flash === "served" && "chip-served",
+        flash === "retry" && "chip-retry chip-shake"
       )}
     >
-      <span className="h-1 w-1 rounded-full bg-emerald-500/70" />
+      <span
+        className={cn(
+          "h-1 w-1 rounded-full transition-colors",
+          flash === "retry" ? "bg-amber-500" : "bg-emerald-500/70"
+        )}
+      />
       <span className="font-mono font-medium text-stone-700">{name}</span>
     </div>
   );
 }
 
+/* chips are evenly spaced on the ring, so they cross the hub intake
+   point (left, 180°) in a fixed order — flash each one as it passes */
+const PASS_SEQ = [4, 3, 2, 1, 0, 5];
+const PASS_MS = 38000 / CLIENTS.length;
+
 function Orbit({ scale = 1 }: { scale?: number }) {
   const compact = scale < 1;
+  const [flash, setFlash] = useState<{
+    i: number;
+    mode: "served" | "retry";
+    count: number;
+  } | null>(null);
+
+  useEffect(() => {
+    let idx = 0;
+    let count = 0;
+    let interval: ReturnType<typeof setInterval> | undefined;
+    let retryT: ReturnType<typeof setTimeout> | undefined;
+    const fire = () => {
+      const i = PASS_SEQ[idx % PASS_SEQ.length];
+      idx += 1;
+      count += 1;
+      if (count % 4 === 0) {
+        /* every 4th pass: a 429 gets absorbed, retried, then smooth again */
+        setFlash({ i, mode: "retry", count });
+        retryT = setTimeout(
+          () => setFlash({ i, mode: "served", count: count + 0.5 }),
+          550
+        );
+      } else {
+        setFlash({ i, mode: "served", count });
+      }
+    };
+    const first = setTimeout(() => {
+      fire();
+      interval = setInterval(fire, PASS_MS);
+    }, 3400);
+    return () => {
+      clearTimeout(first);
+      if (retryT) clearTimeout(retryT);
+      if (interval) clearInterval(interval);
+    };
+  }, []);
+
   return (
     <div
       className="relative"
@@ -319,6 +392,13 @@ function Orbit({ scale = 1 }: { scale?: number }) {
       </div>
       {/* hub — the stream plugs in here */}
       <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
+        {flash ? (
+          <span
+            key={flash.count}
+            aria-hidden
+            className="hit-ring absolute left-1/2 top-1/2 h-16 w-16 rounded-2xl border-2 border-emerald-400/60"
+          />
+        ) : null}
         <div className="hub-pulse flex h-16 w-16 flex-col items-center justify-center rounded-2xl border border-emerald-600/25 bg-white shadow-[0_14px_28px_-12px_oklch(0.6_0.14_155/0.45)]">
           <Terminal
             className={cn("text-emerald-600", compact ? "h-4 w-4" : "h-5 w-5")}
@@ -342,7 +422,11 @@ function Orbit({ scale = 1 }: { scale?: number }) {
               style={{ left, top, transform: "translate(-50%,-50%)" }}
             >
               <div className="orbit-chip">
-                <ClientChip name={c} compact={compact} />
+                <ClientChip
+                  name={c}
+                  compact={compact}
+                  flash={flash?.i === i ? flash.mode : null}
+                />
               </div>
             </div>
           );
@@ -373,12 +457,15 @@ function TopologyPanel({ children }: { children: ReactNode }) {
           </span>
         </div>
         <p className="hidden font-mono text-[10px] uppercase tracking-[0.18em] text-stone-400 md:block">
-          4 upstreams · 12 keys · 6 agents
+          4 upstreams · 12 keys · <span className="text-emerald-600">∞ headroom</span>
         </p>
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1.5 rounded-lg border border-stone-900/[0.08] bg-white px-2.5 py-1 font-mono text-[10px] text-stone-500">
             <Zap className="h-3 w-3 text-emerald-600" strokeWidth={2} />
-            <span className="tnum font-semibold text-stone-900">
+            <span
+              key={reqs}
+              className="tick-in tnum font-semibold text-stone-900"
+            >
               {reqs.toLocaleString("en-US")}
             </span>
             <span className="hidden sm:inline">routed</span>
@@ -444,13 +531,6 @@ function HeroDiagramDesktop() {
             strokeWidth={1.5}
           />
         ))}
-        {/* giant infinity watermark */}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute left-[76%] top-[47%] -translate-x-1/2 -translate-y-1/2 select-none font-mono text-[21rem] font-bold leading-none text-stone-900/[0.04]"
-        >
-          ∞
-        </span>
 
         {/* wires + stream + rings */}
         <svg
@@ -547,8 +627,8 @@ function HeroDiagramDesktop() {
                       <circle r={packetR + 2.6} fill="#10b981" opacity="0.22" />
                       <circle r={packetR} fill="#059669" />
                       <animateMotion
-                        dur="2.3s"
-                        begin={`${-(i * 0.5 + k * 1.15)}s`}
+                        dur="2s"
+                        begin={`${-(i * 0.45 + k * 1)}s`}
                         repeatCount="indefinite"
                         path={d}
                       />
@@ -600,8 +680,8 @@ function HeroDiagramDesktop() {
                 <circle r="8.5" fill="#10b981" opacity="0.25" />
                 <circle r="4.6" fill="#a7f3d0" />
                 <animateMotion
-                  dur="1.6s"
-                  begin={`${-k * 0.55}s`}
+                  dur="1.25s"
+                  begin={`${-k * 0.42}s`}
                   repeatCount="indefinite"
                   path={STREAM}
                 />
@@ -635,22 +715,26 @@ function HeroDiagramDesktop() {
           </motion.div>
         </div>
 
-        {/* 166 RPM badge — rides on the stream */}
+        {/* 166 RPM badge — rides the stream, snug against the hub */}
         <div
           className="absolute z-10 -translate-x-1/2 -translate-y-1/2"
-          style={{ left: "69.9%", top: "49.5%" }}
+          style={{ left: "75.6%", top: "49.5%" }}
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.7 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 1.75, duration: 0.7, ease: EASE }}
           >
-            <div className="glass rounded-2xl px-4 py-2.5 text-center">
+            <div className="glass rounded-2xl px-4 py-2 text-center">
               <p className="tnum font-mono text-xl font-bold leading-none text-emerald-700">
                 <Counter to={166} duration={2.2} />
               </p>
-              <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.2em] text-stone-500">
+              <p className="mt-1 font-mono text-[8.5px] uppercase tracking-[0.18em] text-stone-500">
                 rpm combined
+              </p>
+              <p className="mt-0.5 flex items-center justify-center gap-1 font-mono text-[8px] uppercase tracking-[0.14em] text-emerald-600">
+                <Plus className="h-2 w-2" strokeWidth={2.4} />
+                every key adds more
               </p>
             </div>
           </motion.div>
