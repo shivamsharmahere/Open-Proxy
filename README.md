@@ -1,64 +1,77 @@
 <div align="center">
 
-<img src="docs/assets/logo.png" alt="nim-proxy" width="140">
+<img src="docs/assets/logo.png" alt="open-proxy" width="140">
 
-# nim-proxy
+# open-proxy
 
-**A tiny, rate-limit-aware OpenAI-compatible proxy for the [NVIDIA NIM API](https://build.nvidia.com).**
-One job: obey the NIM speed limit so your client never sees it.
+**A tiny, multi-provider, rate-limit-aware OpenAI-compatible proxy. One proxy, every provider, zero 429s.**
+Add API keys from NVIDIA NIM, OpenRouter, TokenRouter, OpenAI, or any OpenAI-compatible API — open-proxy merges them into a single pool, obeys every upstream's speed limit, and keeps your clients running.
 
 [![CI](https://github.com/miztertea/nim-proxy/actions/workflows/ci.yml/badge.svg)](https://github.com/miztertea/nim-proxy/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/miztertea/nim-proxy)](https://github.com/miztertea/nim-proxy/releases/latest)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/miztertea/nim-proxy/badge)](https://scorecard.dev/viewer/?uri=github.com/miztertea/nim-proxy)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13484/badge)](https://www.bestpractices.dev/projects/13484)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Container: GHCR](https://img.shields.io/badge/container-ghcr.io-2496ED?logo=docker&logoColor=white)](https://github.com/miztertea/nim-proxy/pkgs/container/nim-proxy)
 
-<img src="docs/assets/dashboard-overview.png" alt="The nim-proxy dashboard: Overview tab" width="850">
+<img src="docs/assets/dashboard-overview.png" alt="The open-proxy dashboard: Overview tab" width="850">
 
 </div>
 
 ---
 
-NIM's free tier has no credits and no token caps — just a ~40 requests-per-minute limit per API key. When a client (OpenCode, Codex, n8n, or anything else that speaks the OpenAI API) hits that limit, the upstream returns a 429 and most clients simply abort the task. nim-proxy sits in between and makes the limit invisible:
+Every upstream provider has its own rate limits — typically 40 requests per minute per API key. When a client (OpenCode, Codex, n8n, or anything that speaks the OpenAI API) hits that limit, the upstream returns a 429 and most clients simply abort the task. open-proxy sits in between and makes the limit invisible:
 
 ```
 OpenCode ─┐
-Codex     ├──► nim-proxy ──► integrate.api.nvidia.com
-n8n       ┘    │
-               ├─ paces requests to 40 RPM per key (sliding window)
-               ├─ load-balances across all your keys (5 keys = 200 RPM)
+Codex     ├──► open-proxy ──┬─► integrate.api.nvidia.com   (NIM free tier)
+n8n       ┘    │             ├─► openrouter.ai/api/v1       (OpenRouter)
+               │             ├─► api.tokenrouter.com         (TokenRouter)
+               │             └─► api.openai.com/v1           (OpenAI)
+               │
+               ├─ paces requests per key (sliding window, respects each upstream's limit)
+               ├─ load-balances across all your keys and providers
                ├─ pins each conversation to one key (prefix-cache affinity)
                ├─ rides out 429/5xx with retries + Retry-After
-               ├─ adapts to NIM's per-model worker-concurrency ceiling
+               ├─ adapts to per-model worker-concurrency ceilings
                ├─ keeps client connections alive with SSE heartbeats
                ├─ answers /v1/models from cache (catalog polls cost nothing)
                └─ dashboard + Prometheus metrics for everything above
 ```
 
-This tool is **not** designed to circumvent NVIDIA's terms of service. It maximizes your own API keys — or a shared pool of keys owned by you and your friends — while *respecting* NVIDIA's speed limits. Every key holds to its 40 RPM; the proxy just makes agents patient enough to live within that budget. Load-tested to prove it: 100 concurrent clients, zero upstream rate violations.
+The more keys you add, the higher your combined throughput: 3 NIM keys (120 RPM) + 5 OpenRouter keys (200 RPM) = **320 RPM** total, automatically distributed. Each key holds to its own upstream's limit; the proxy just makes agents patient enough to live within the budget. Load-tested to prove it: 100 concurrent clients, zero upstream rate violations.
 
 ## Quick start
 
-**1. Get API keys.** Sign up at [build.nvidia.com](https://build.nvidia.com) (free, keys look like `nvapi-…`; each account needs a unique email and phone number). You'll paste keys into the setup wizard — never into a file.
+**1. Get API keys.** Sign up with any supported provider and grab an API key:
 
-**2. Run the proxy.** The published image is multi-arch, signed, and ~5 MB, with hardened defaults and persistent history:
+| Provider | Sign up | Key format | Free tier |
+|---|---|---|---|
+| **NVIDIA NIM** | [build.nvidia.com](https://build.nvidia.com) | `nvapi-…` | Yes — 40 RPM/key |
+| **OpenRouter** | [openrouter.ai](https://openrouter.ai) | `sk-or-…` | Credit-based |
+| **TokenRouter** | [tokenrouter.com](https://tokenrouter.com) | varies | Yes |
+| **OpenAI** | [platform.openai.com](https://platform.openai.com) | `sk-…` | Pay-as-you-go |
+| **Self-hosted** | your server | varies | Any OpenAI-compatible API |
+
+You'll paste keys into the setup wizard — never into a file. Add as many providers and keys as you like; they all merge into one pool.
+
+**2. Run the proxy.** The image is multi-arch, ~5 MB, with hardened defaults and persistent history:
 
 ```sh
-docker run -d --name nim-proxy -p 127.0.0.1:8000:8000 -v nim-proxy-data:/data \
-  ghcr.io/miztertea/nim-proxy:latest
+docker build -t open-proxy .
+docker run -d --name open-proxy -p 127.0.0.1:8000:8000 -v open-proxy-data:/data \
+  open-proxy
 ```
 
-With a checkout you can use compose (`docker compose up -d`), build from source (`docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build`), or skip Docker entirely (`cargo run --release`). The `.env` file is optional and holds only container-level vars — see [Configuration](#configuration).
+With a checkout you can also use compose (`docker compose up -d --build`), or skip Docker entirely (`cargo run --release`). The `.env` file is optional and holds only container-level vars — see [Configuration](#configuration).
 
 ```
-     _  _ ___ __  __   ___ ___  _____  ____   __
-    | \| |_ _|  \/  | | _ \ _ \/ _ \ \/ /\ \ / /
-    | .` || || |\/| | |  _/   / (_) >  <  \ V /
-    |_|\_|___|_|  |_| |_| |_|_\\___/_/\_\  |_|
+   ___  ___ ___ _  _   ___ ___  _____  ____   __
+  / _ \| _ \ __| \| | | _ \ _ \/ _ \ \/ /\ \ / /
+ | (_) |  _/ _|| .` | |  _/   / (_) >  <  \ V /
+  \___/|_| |___|_|\_| |_| |_|_\\___/_/\_\  |_|
 ```
 
-**3. Claim it.** Open `http://localhost:8000/` — a fresh install runs the **first-run wizard**: create the superuser account, add at least one NIM key (validated live against the upstream), and finish. By default the wizard also mints your first **client API key** (`npk_…`) and ends on a connect panel with the base URL and key ready to copy — so your client works immediately.
+**3. Claim it.** Open `http://localhost:8000/` — a fresh install runs the **first-run wizard**: create the superuser account, add at least one API key (validated live against the upstream), and finish. By default the wizard also mints your first **client API key** (`npk_…`) and ends on a connect panel with the base URL and key ready to copy — so your client works immediately.
 
 <div align="center"><img src="docs/assets/setup-wizard.png" alt="First-run setup wizard" width="460"></div>
 
@@ -68,7 +81,7 @@ With a checkout you can use compose (`docker compose up -d`), build from source 
 
 ## Client recipes
 
-Model IDs pass through verbatim — use any ID from the [NIM catalog](https://build.nvidia.com/models) (or `curl localhost:8000/v1/models`). In **API key required** mode (stored as `keyed`, the default), clients authenticate with a client API key (`npk_…`) minted in the wizard or in Settings. In **Open (no authentication)** mode (stored as `open`), no client key is needed.
+Model IDs pass through verbatim — use any model ID your provider supports (or `curl localhost:8000/v1/models` to see the merged catalog). In **API key required** mode (stored as `keyed`, the default), clients authenticate with a client API key (`npk_…`) minted in the wizard or in Settings. In **Open (no authentication)** mode (stored as `open`), no client key is needed.
 
 **OpenCode** — `opencode.json`:
 
@@ -78,7 +91,7 @@ Model IDs pass through verbatim — use any ID from the [NIM catalog](https://bu
   "provider": {
     "nim": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "NVIDIA NIM (proxied)",
+      "name": "OpenProxy (proxied)",
       "options": {
         "baseURL": "http://localhost:8000/v1",
         "apiKey": "npk_your-key-here",
@@ -102,13 +115,13 @@ model_provider = "nim"
 model = "moonshotai/kimi-k2-instruct"
 
 [model_providers.nim]
-name = "NVIDIA NIM (proxied)"
+name = "OpenProxy (proxied)"
 base_url = "http://localhost:8000/v1"
-env_key = "NIM_PROXY_API_KEY"   # export NIM_PROXY_API_KEY=npk_your-key-here
+env_key = "OPENPROXY_API_KEY"   # export OPENPROXY_API_KEY=npk_your-key-here
 wire_api = "chat"
 ```
 
-**n8n** — add an *OpenAI* credential with Base URL `http://localhost:8000/v1` and your `npk_…` key, then use it in AI nodes with a NIM model ID.
+**n8n** — add an *OpenAI* credential with Base URL `http://localhost:8000/v1` and your `npk_…` key, then use it in AI nodes with a model ID from your provider.
 
 **Plain curl**:
 
@@ -168,10 +181,12 @@ view. Real history size depends on metric and label cardinality—the old
 fixed-size estimate was wrong—so monitor the displayed history-file size for
 your workload.
 
-**Settings.** Everything app-level is managed here: NIM keys (per-key rpm,
-enable/disable), client API keys, the API authentication mode, upstream URL,
-limits, default time range, history retention, availability SLO, model
-limits, and users. Saves validate, persist, and apply
+**Settings.** Everything app-level is managed here: endpoint groups (each an
+OpenAI-compatible API with its own keys and rate limits), upstream API keys (per-key
+rpm, enable/disable, group assignment), model routing (per-group allowlists
+plus global model toggles), client API keys, the API authentication mode,
+upstream URL, limits, default time range, history retention, availability
+SLO, model limits, and users. Saves validate, persist, and apply
 live. The config file itself is read at boot; an out-of-band edit to
 `DATA_DIR/config.json` requires a restart.
 
@@ -179,14 +194,14 @@ live. The config file itself is read at boot; an out-of-band edit to
 
 ## How it works
 
-- **One rate window per key.** Each API key gets an exact sliding-window limiter (40 requests per rolling 60 s — matching NIM's limiter, not a burstable token bucket — plus a 1 s jitter margin so boundary-timed requests can't land inside the upstream's window).
+- **One rate window per key.** Each API key gets an exact sliding-window limiter (configurable per key, defaulting to 40 requests per rolling 60 s — matching common upstream limits, not a burstable token bucket — plus a 1 s jitter margin so boundary-timed requests can't land inside the upstream's window).
 - **One queue for all clients.** Any number of clients share the key pool through a global FIFO dispatcher: slots are granted strictly in arrival order, no client can starve another, and a client that disconnects while queued returns its slot.
-- **Sticky conversations, spread bursts.** Each conversation prefers the same key every turn, keeping any server-side [prefix cache](https://docs.nvidia.com/nim/large-language-models/latest/kv-cache-reuse.html) warm. When that key is full the request spills to the least-loaded ready key — the API is stateless, so crossing keys is always safe, just potentially a cold cache.
+- **Sticky conversations, spread bursts.** Each conversation prefers the same key every turn, keeping any server-side prefix cache warm. When that key is full the request spills to the least-loaded ready key — the API is stateless, so crossing keys is always safe, just potentially a cold cache.
 - **Heartbeats instead of failures.** For streaming requests the proxy commits to `200 text/event-stream` immediately and emits SSE comment lines (`: heartbeat` — ignored by every OpenAI client) while it waits for a slot or rides out upstream 429/500/502/503/504 with `Retry-After` honored and instant failover between keys. Streams that stall mid-generation are cut after the `stream_idle` limit.
 - **Optional absolute deadlines.** `X-Nim-Proxy-Deadline-Ms` bounds the whole request independently of heartbeats or socket activity. Expiry cancels queue/retry/upstream work and releases its key, model, and in-flight ownership.
-- **Model-pressure aware.** NIM caps per-model worker concurrency independently of the 40 RPM key limit; the proxy detects that specific exhaustion, backs off the affected *model* adaptively (never wasting healthy key capacity on failover), and surfaces it on the dashboard — see [architecture: governor](knowledge/architecture/governor.md).
+- **Model-pressure aware.** Some providers cap per-model worker concurrency independently of the per-key rate limit; the proxy detects that specific exhaustion, backs off the affected *model* adaptively (never wasting healthy key capacity on failover), and surfaces it on the dashboard — see [architecture: governor](knowledge/architecture/governor.md).
 - **Pass-through with one exception.** Bodies are forwarded untouched, except: streaming chat requests get `stream_options: {"include_usage": true}` injected so token accounting is exact rather than estimated. If a model rejects the field, the proxy retries untouched and never injects for that model again. `strict_passthrough` in Settings disables injection entirely.
-- **Local answers where possible.** `GET /v1/models` is cached (10 min default, single-flight refresh), so client catalog polls don't burn rate budget.
+- **Local answers where possible.** `GET /v1/models` is cached (10 min default, single-flight refresh), so client catalog polls don't burn rate budget. With several endpoint groups the catalog fans out (one slot per group that has a key) and merges by model id, minus globally disabled models.
 
 ## Configuration
 
@@ -205,14 +220,24 @@ Environment variables cover container-level concerns only:
 Docker Compose also reads `PUBLISH_HOST` from `.env` for the host-side port
 publish. It defaults to `127.0.0.1`; set `PUBLISH_HOST=0.0.0.0` only when the
 deployment is ready for LAN/public reachability. This is a Compose setting,
-not an environment variable consumed by nim-proxy.
+not an environment variable consumed by the proxy.
 
-Everything else is a Settings control: NIM keys (per-key rpm, enable/disable,
-ownership), the upstream base URL, client API keys and the API authentication
+Everything else is a Settings control: endpoint groups (each an
+OpenAI-compatible API with its own base URL, keys, enable toggle, and model
+allowlist), upstream API keys (per-key rpm,
+enable/disable, ownership, group assignment), model toggles (globally
+disabled models are hidden from the merged `/v1/models` catalog and rejected
+with `model_disabled` before queueing), the upstream base URL (the primary
+group's), client API keys and the API authentication
 mode (`keyed`/`open` in stored config), limits (`max_wait`, `heartbeat`,
 `stream_idle`, `request_timeout`, `models_ttl`, `max_inflight`,
 `strict_passthrough`), default time range, history retention, availability SLO,
 model limits, and users & roles.
+
+Requests route by model name: a model pinned in a group's allowlist is served
+only by that group; any other model falls back to the groups with an empty
+allowlist (catch-alls). A model no enabled group carries is a `404
+model_not_found`, not a wait-until-timeout.
 
 ## Security & deployment
 
@@ -222,13 +247,13 @@ The proxy **fails closed**. Before setup, the data plane is closed (`/v1` → `5
 
 The wizard creates the **superuser** — an admin that can never be deleted (so the last admin can't vanish). From Settings → Users, admins add more users:
 
-- **superuser** — an admin; the one account that can't be deleted, and it always owns ≥1 enabled NIM key (the pool floor).
+- **superuser** — an admin; the one account that can't be deleted, and it always owns ≥1 enabled API key (the pool floor).
 - **admin** — server settings + user management.
-- **user** — own account, own client API keys, own NIM keys. Sees every dashboard tab (identical for all roles) but only their own key rows.
+- **user** — own account, own client API keys, own upstream API keys. Sees every dashboard tab (identical for all roles) but only their own key rows.
 
-That last role is the shared-pool model: a friend adds their NIM key to the pool and mints their own client key; nobody else — not even an admin — can ever see either value.
+That last role is the shared-pool model: a friend adds their API key to the pool and mints their own client key; nobody else — not even an admin — can ever see either value.
 
-Login is username + password → a signed, HttpOnly, SameSite=Strict session cookie. Changing or resetting a password logs that user's other sessions out instantly; deleting a user kills their sessions, pulls their NIM keys from the pool, and revokes their client keys. Passwords are PBKDF2-HMAC-SHA256 (600k iterations). Forgot a password? Any admin resets it (except the superuser's — that one only rotates via its own Account page). Locked out entirely? Stop the container, empty the `"users"` array in `config.json` on the volume, restart — the wizard re-creates the superuser and keys/settings survive.
+Login is username + password → a signed, HttpOnly, SameSite=Strict session cookie. Changing or resetting a password logs that user's other sessions out instantly; deleting a user kills their sessions, pulls their API keys from the pool, and revokes their client keys. Passwords are PBKDF2-HMAC-SHA256 (600k iterations). Forgot a password? Any admin resets it (except the superuser's — that one only rotates via its own Account page). Locked out entirely? Stop the container, empty the `"users"` array in `config.json` on the volume, restart — the wizard re-creates the superuser and keys/settings survive.
 
 ### `/v1` API authentication
 
@@ -245,9 +270,9 @@ Prometheus scrapes `/metrics` with `Authorization: Bearer <username>:<password>`
 
 ```yaml
 scrape_configs:
-  - job_name: nim-proxy
+  - job_name: open-proxy
     authorization: { credentials: "<username>:<password>" }
-    static_configs: [{ targets: ["nim-proxy:8000"] }]
+    static_configs: [{ targets: ["open-proxy:8000"] }]
 ```
 
 `/health` stays public (load-balancer / Docker probe; exposes nothing).
@@ -266,7 +291,7 @@ viewer or client generator at it; nothing is served at runtime, which keeps
 the Content-Security-Policy strict and the image a single static binary.
 
 The OpenAI-compatible `/v1` surface is deliberately not in there — that
-contract is NVIDIA NIM's, and nim-proxy passes it through.
+contract is your upstream provider's, and open-proxy passes it through.
 
 ### Deployment patterns
 
@@ -285,7 +310,7 @@ The build and release path is hardened to the OpenSSF baseline (scored weekly by
 ## Operations
 
 - **Image**: built `FROM scratch` — a ~5 MB static musl binary with TLS roots compiled in. No shell, no libc, no CA bundle. Runs as a non-root UID with `read_only`, `cap_drop: ALL`, `no-new-privileges`; rootless Docker/Podman compatible.
-- **Healthcheck**: the binary doubles as its own probe (`nim-proxy --health`); `docker ps` shows `healthy`.
+- **Healthcheck**: the binary doubles as its own probe (`open-proxy --health`); `docker ps` shows `healthy`.
 - **Logs**: the ASCII banner + structured startup detail, then one access line per request (`200 alice model /v1/chat/completions (3210 ms)`). ANSI color is TTY-detected, so `docker logs` stays clean.
 - **Metrics**: Prometheus exposition at `GET /metrics` (scrapeable by any OTel collector's Prometheus receiver). Full series list below.
 - **Shutdown**: SIGTERM and SIGINT both drain gracefully.
@@ -322,7 +347,7 @@ The build and release path is hardened to the OpenSSF baseline (scored weekly by
 | `nimproxy_unauthorized_total` | — | Rejected API requests |
 | `nimproxy_login_failures_total` | — | Failed dashboard logins |
 | `nimproxy_shed_total` | — | Requests shed at the in-flight cap |
-| `nimproxy_worker_exhausted_total` | model | NIM per-model worker-concurrency exhaustion events |
+| `nimproxy_worker_exhausted_total` | model | Per-model worker-concurrency exhaustion events (when the upstream enforces it) |
 | `nimproxy_model_inflight` | model | Requests in flight per model (governor gauge) |
 | `nimproxy_model_limit` | model | Current per-model concurrency cap; `0` = ungoverned |
 
@@ -335,12 +360,12 @@ Request shape (messages, tools, sampling params) is captured as **counts and siz
 Four layers (unit, end-to-end, load, fuzz), all runnable locally:
 
 ```sh
-cargo test          # unit + end-to-end tests (real binary vs a scripted mock NIM)
+cargo test          # unit + end-to-end tests (real binary vs a scripted mock upstream)
 ```
 
 The e2e suite covers auth (client keys, multi-user login, role and ownership enforcement, the fail-closed setup posture and the wizard), the config store (round-trip across restart, atomic saves, refusal on corrupt/future-version stores), 429 ride-out with key failover, per-model worker-exhaustion governing, Retry-After timing, pacing enforcement (including live pool rebuilds mid-run), conversation affinity, models caching, usage injection, stalled-stream recovery, label-injection sanitizing, security headers, metrics accuracy, history persistence across restart, and SIGTERM.
 
-Load test — 100 concurrent clients against a mock that *strictly enforces* NIM's per-key window and counts violations (`--worker-slots` also emits NIM's real per-model worker-exhaustion error so the governor is exercised):
+Load test — 100 concurrent clients against a mock that *strictly enforces* the upstream's per-key window and counts violations (`--worker-slots` also emits per-model worker-exhaustion errors so the governor is exercised):
 
 ```sh
 python3 scripts/mock_nim.py --enforce --rpm 40 --worker-slots 32 --port 9999 &
@@ -352,7 +377,7 @@ It exits non-zero on any client-visible failure or a single upstream rate violat
 
 ## Upgrading to 0.6.6
 
-Back up the data volume before upgrading; it contains `config.json`, NIM API
+Back up the data volume before upgrading; it contains `config.json`, API
 keys, password hashes, and client API-key digests. Then pull and restart as
 usual (`docker compose pull && docker compose up -d`, or replace the image in
 your existing `docker run` deployment).
@@ -376,7 +401,7 @@ production locale is `en-US`; the generated `en-XA` pseudolocale is test-only.
 
 ## FAQ & limitations
 
-- **Is this against NVIDIA's ToS? It's designed not to be.** The proxy never exceeds any key's rate limit — that's its entire purpose. Keys are issued per developer account; whether you pool keys with friends is between you and [NVIDIA's terms](https://www.nvidia.com/en-us/agreements/) — the proxy just guarantees each key behaves.
+- **Is this against my provider's ToS?** It's designed not to be. The proxy never exceeds any key's rate limit — that's its entire purpose. Keys are issued per developer account; whether you pool keys with others is between you and the provider's terms — the proxy just guarantees each key behaves.
 - **Non-streaming requests can't be heartbeated** (no wire format for it) — they wait silently through pacing/retries up to the `max_wait` limit. Agent clients normally stream, so this rarely matters.
 - **One instance per key set.** Rate state is in-memory; two replicas sharing keys would each assume the full 40 RPM. Run one instance (it comfortably saturates far more keys than you can register).
 - **Rate windows reset on restart.** A restart right after heavy traffic can draw a burst of 429s — the retry machinery absorbs them invisibly.
@@ -390,7 +415,7 @@ production locale is `en-US`; the generated `en-XA` pseudolocale is test-only.
 
 ## Project knowledge base
 
-The `knowledge/` directory holds the project's long-term memory — design decisions with their reasoning, validated research about NIM, per-component architecture notes, and runbooks, all cross-linked markdown. Start at [`knowledge/index.md`](knowledge/index.md). [`AGENTS.md`](AGENTS.md) tells AI agents how to maintain it.
+The `knowledge/` directory holds the project's long-term memory — design decisions with their reasoning, research about upstream providers, per-component architecture notes, and runbooks, all cross-linked markdown. Start at [`knowledge/index.md`](knowledge/index.md). [`AGENTS.md`](AGENTS.md) tells AI agents how to maintain it.
 
 ## Contributing, security & support
 

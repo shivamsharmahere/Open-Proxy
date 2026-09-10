@@ -70,6 +70,7 @@ page describes a conclusion, a plan describes the live state.
 | [dashboard](architecture/dashboard.md) | Split embedded operator console; one honest complete/partial/unavailable window across 5 tabs plus clearly scoped Now values |
 | [presentation-layer](architecture/presentation-layer.md) | Compile-time public/operator pages and assets with strict same-origin CSP, explicit gates, and served-byte browser proof |
 | [client-auth](architecture/client-auth.md) | `/v1` client keys (open/keyed) + store-backed multi-user dashboard sessions; fail-closed posture |
+| [multi-upstream](architecture/multi-upstream.md) | Several OpenAI-compatible APIs per proxy; model-name routing, per-group allowlists, global model toggles, merged catalog |
 | [http-trust-boundary-map](architecture/http-trust-boundary-map.md) | Every live route mapped across phase, authentication, roles, wire types, side effects, callers, OpenAPI, and real-request proof |
 
 ## Operations — runbooks

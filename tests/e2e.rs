@@ -303,6 +303,15 @@ fn contract_body(
         "api-settings-upstream" => {
             serde_json::json!({"base_url": format!("{}/matrix-{suffix}", mock.url)})
         }
+        "api-settings-upstreams" => {
+            serde_json::json!({"add": {
+                "name": format!("matrix-extra-{suffix}"),
+                "base_url": mock.url,
+            }})
+        }
+        "api-settings-models" => {
+            serde_json::json!({"disabled": [format!("matrix/unused-{suffix}")]})
+        }
         "api-settings-locale" => serde_json::json!({"locale": "en-US"}),
         "api-settings-account" => serde_json::json!({
             "current_password": TEST_PASSWORD,
@@ -798,6 +807,32 @@ async fn route_contract_behavior_matrix() {
             path: "/api/settings/upstream",
         },
         RouteBehavior {
+            access: ContractAccess::OperatorAdmin,
+            accept_html: false,
+            expectations: configured_contract_expectations(200, 403),
+            method: "POST",
+            name: "api-settings-upstreams",
+            phase: ContractPhase::PostSetup,
+            request: ContractRequest::Json,
+            side_effect: ContractSideEffect::DurableConfig,
+            success_content_type: Some("application/json"),
+            success_status: 200,
+            path: "/api/settings/upstreams",
+        },
+        RouteBehavior {
+            access: ContractAccess::OperatorAdmin,
+            accept_html: false,
+            expectations: configured_contract_expectations(200, 403),
+            method: "POST",
+            name: "api-settings-models",
+            phase: ContractPhase::PostSetup,
+            request: ContractRequest::Json,
+            side_effect: ContractSideEffect::DurableConfig,
+            success_content_type: Some("application/json"),
+            success_status: 200,
+            path: "/api/settings/models",
+        },
+        RouteBehavior {
             access: ContractAccess::Public,
             accept_html: true,
             expectations: [
@@ -943,7 +978,7 @@ async fn route_contract_behavior_matrix() {
         },
     ];
 
-    assert_eq!(rows.len(), 36, "route-contract:inventory");
+    assert_eq!(rows.len(), 38, "route-contract:inventory");
 
     let mock = start_mock().await;
     let before_setup = start_proxy_fresh().await;
@@ -4159,7 +4194,7 @@ async fn dashboard_and_config_are_served_to_authenticated_users() {
         .unwrap();
     assert_eq!(dash.status(), 200);
     let html = dash.text().await.unwrap();
-    assert!(html.contains("NIM"));
+    assert!(html.contains("Proxy"));
     assert!(html.contains("data-range=\"default\""));
     assert!(html.contains("data-range=\"all-retained\""));
     let dashboard_js = client()
@@ -4602,12 +4637,12 @@ async fn legacy_history_is_warned_once_without_parsing_or_mutating_it() {
         .local_addr()
         .unwrap()
         .port();
-    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_nim-proxy"))
+    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_open-proxy"))
         .env_clear()
         .current_dir(std::env::temp_dir())
         .env("PORT", port.to_string())
         .env("DATA_DIR", &data_dir)
-        .env("RUST_LOG", "nim_proxy=warn")
+        .env("RUST_LOG", "open_proxy=warn")
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
@@ -4656,12 +4691,12 @@ async fn stale_canonical_temporaries_are_counted_once_without_inspection_or_dele
         .local_addr()
         .unwrap()
         .port();
-    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_nim-proxy"))
+    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_open-proxy"))
         .env_clear()
         .current_dir(std::env::temp_dir())
         .env("PORT", port.to_string())
         .env("DATA_DIR", &data_dir)
-        .env("RUST_LOG", "nim_proxy=warn")
+        .env("RUST_LOG", "open_proxy=warn")
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
@@ -5420,7 +5455,7 @@ async fn operator_surface_always_requires_auth() {
         .await
         .unwrap();
     assert_eq!(dash.status(), 200);
-    assert!(dash.text().await.unwrap().contains("NIM"));
+    assert!(dash.text().await.unwrap().contains("Proxy"));
 }
 
 #[tokio::test]
@@ -5851,7 +5886,7 @@ async fn locale_catalog_routes_are_gated() {
                     let messages = catalog["messages"].as_object().expect("plain messages");
                     assert_eq!(
                         messages.get("common.app_name"),
-                        Some(&serde_json::Value::String("NIM Proxy".into()))
+                        Some(&serde_json::Value::String("Open Proxy".into()))
                     );
                     assert!(
                         messages.values().all(serde_json::Value::is_string),
@@ -6513,6 +6548,23 @@ async fn locale_preferences_are_fail_closed() {
         .as_object_mut()
         .expect("locale-preferences: config object")
         .insert("default_locale".into(), serde_json::json!("en-US"));
+    // Additive multi-upstream defaults (an enabled primary group with an
+    // empty allowlist, no extra groups, no disabled models) persist on the
+    // first commit alongside the locale default — same migration-on-save.
+    {
+        let obj = expected_server_default
+            .as_object_mut()
+            .expect("locale-preferences: config object");
+        obj.entry("upstreams").or_insert(serde_json::json!([]));
+        obj.entry("disabled_models")
+            .or_insert(serde_json::json!([]));
+        let up = obj.entry("upstream").or_insert(serde_json::json!({}));
+        let up = up
+            .as_object_mut()
+            .expect("locale-preferences: upstream object");
+        up.entry("enabled").or_insert(serde_json::json!(true));
+        up.entry("models").or_insert(serde_json::json!([]));
+    }
     for (label, cookie, locale) in [
         ("admin-server-default", admin.as_str(), "EN-us"),
         ("superuser-server-default", superuser.as_str(), "en-US"),
@@ -7882,7 +7934,7 @@ async fn server_settings_save_is_atomic() {
     .await;
     assert_eq!(status, 200, "combined server save: {v}");
     let after = api_config(&proxy, &root).await;
-    assert_eq!(after["server"]["base_url"], "https://changed.invalid/v1");
+    assert_eq!(after["server"]["base_url"], "https://changed.invalid");
     assert_eq!(
         after["server"]["limits"],
         serde_json::json!({
@@ -8634,7 +8686,7 @@ async fn health_probe_flag_reports_liveness() {
     let mock = start_mock().await;
     let proxy = start_proxy(&mock.url, &[]).await;
     let run_health = |port: String| {
-        let mut cmd = std::process::Command::new(env!("CARGO_BIN_EXE_nim-proxy"));
+        let mut cmd = std::process::Command::new(env!("CARGO_BIN_EXE_open-proxy"));
         cmd.arg("--health").env("PORT", port);
         // Forward the coverage profile path so the probe subprocess is counted
         // under `cargo llvm-cov` (a no-op in a normal test run).
@@ -8651,4 +8703,346 @@ async fn health_probe_flag_reports_liveness() {
         !run_health("1".into()).success(),
         "--health exits non-zero against a dead port"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Multi-upstream endpoint groups: several OpenAI-compatible APIs behind one
+// proxy, with model-name routing and model toggles.
+// ---------------------------------------------------------------------------
+
+/// A second OpenAI-compatible API as an endpoint group with one key.
+fn extra_group(mock: &support::MockNim, models: &[&str]) -> support::ExtraUpstream {
+    support::ExtraUpstream {
+        name: "second".into(),
+        base_url: mock.url.clone(),
+        models: models.iter().map(|m| m.to_string()).collect(),
+        keys: vec![("test-key-second".into(), 40)],
+    }
+}
+
+fn chat_with_model(model: &str) -> serde_json::Value {
+    serde_json::json!({
+        "model": model,
+        "stream": false,
+        "messages": [{"role": "user", "content": "hi"}],
+    })
+}
+
+#[tokio::test]
+async fn multi_upstream_pinned_model_routes_to_its_group() {
+    let primary = start_mock().await;
+    let second = start_mock().await;
+    let proxy = start_proxy_with(
+        &primary.url,
+        StoreOpts {
+            extra_upstreams: vec![extra_group(&second, &["special/model"])],
+            ..Default::default()
+        },
+        &[],
+    )
+    .await;
+
+    // A model pinned to the second group is served with that group's key.
+    let resp = client()
+        .post(proxy.url("/v1/chat/completions"))
+        .json(&chat_with_model("special/model"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    assert_eq!(second.state.hit_count(), 1);
+    assert_eq!(second.state.hit_keys(), vec!["test-key-second"]);
+    assert_eq!(primary.state.hit_count(), 0);
+
+    // An unlisted model falls back to the catch-all primary group.
+    let resp = client()
+        .post(proxy.url("/v1/chat/completions"))
+        .json(&chat_body("hi", false))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    assert_eq!(primary.state.hit_count(), 1);
+    assert_eq!(second.state.hit_count(), 1);
+}
+
+#[tokio::test]
+async fn multi_upstream_unknown_model_is_a_404_without_spending_budget() {
+    let primary = start_mock().await;
+    let second = start_mock().await;
+    let proxy = start_proxy_with(
+        &primary.url,
+        StoreOpts {
+            primary_models: vec!["only/a".into()],
+            extra_upstreams: vec![extra_group(&second, &["only/b"])],
+            ..Default::default()
+        },
+        &[],
+    )
+    .await;
+
+    // No enabled group carries "other/c": a 404, not a wait-until-timeout.
+    let resp = client()
+        .post(proxy.url("/v1/chat/completions"))
+        .json(&chat_with_model("other/c"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 404);
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(body["error"]["code"], "model_not_found");
+    assert_eq!(primary.state.hit_count(), 0);
+    assert_eq!(second.state.hit_count(), 0);
+
+    // Listed models still route to their own groups.
+    for (model, mock) in [("only/a", &primary), ("only/b", &second)] {
+        let resp = client()
+            .post(proxy.url("/v1/chat/completions"))
+            .json(&chat_with_model(model))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200, "model {model}");
+        assert_eq!(mock.state.hit_count(), 1, "model {model}");
+    }
+}
+
+#[tokio::test]
+async fn multi_upstream_disabled_model_is_rejected_and_hidden() {
+    let mock = start_mock().await;
+    let proxy = start_proxy_with(
+        &mock.url,
+        StoreOpts {
+            disabled_models: vec!["mock/model-a".into()],
+            ..Default::default()
+        },
+        &[],
+    )
+    .await;
+
+    // Disabled models are rejected before queueing: no rate budget spent.
+    let resp = client()
+        .post(proxy.url("/v1/chat/completions"))
+        .json(&chat_body("hi", false))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 404);
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(body["error"]["code"], "model_disabled");
+    assert_eq!(mock.state.hit_count(), 0);
+
+    // ... and hidden from the merged catalog.
+    let resp = client().get(proxy.url("/v1/models")).send().await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let catalog: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(catalog["data"], serde_json::json!([]));
+}
+
+#[tokio::test]
+async fn multi_upstream_catalog_merges_groups_and_dedupes() {
+    let primary = start_mock().await;
+    let second = start_mock().await;
+    let proxy = start_proxy_with(
+        &primary.url,
+        StoreOpts {
+            extra_upstreams: vec![extra_group(&second, &[])],
+            ..Default::default()
+        },
+        &[],
+    )
+    .await;
+
+    // Both groups serve the same mock catalog: one fan-out fetch each,
+    // merged into a single entry.
+    let resp = client().get(proxy.url("/v1/models")).send().await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let catalog: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(catalog["object"], "list");
+    let ids: Vec<&str> = catalog["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, vec!["mock/model-a"]);
+    assert_eq!(primary.state.models_hits.load(Ordering::SeqCst), 1);
+    assert_eq!(second.state.models_hits.load(Ordering::SeqCst), 1);
+
+    // A second poll is served from cache: zero new upstream cost.
+    let resp = client().get(proxy.url("/v1/models")).send().await.unwrap();
+    assert_eq!(resp.status(), 200);
+    assert_eq!(primary.state.models_hits.load(Ordering::SeqCst), 1);
+    assert_eq!(second.state.models_hits.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn multi_upstream_settings_crud_and_model_toggles() {
+    let mock = start_mock().await;
+    let proxy = start_proxy(&mock.url, &[]).await;
+    let cookie = login(&proxy).await;
+
+    // Add a custom OpenAI-compatible endpoint group with a pinned model.
+    let (status, _) = post_json(
+        &proxy,
+        &cookie,
+        "/api/settings/upstreams",
+        serde_json::json!({"add": {
+            "name": "custom", "base_url": mock.url, "models": ["custom/model"],
+        }}),
+    )
+    .await;
+    assert_eq!(status, 200);
+
+    // The group shows up in /api/config with its allowlist.
+    let cfg = api_config(&proxy, &cookie).await;
+    let group = cfg["upstreams"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|g| g["name"] == "custom")
+        .expect("custom group listed")
+        .clone();
+    assert_eq!(group["models"], serde_json::json!(["custom/model"]));
+    assert_eq!(group["enabled"], true);
+
+    // Keys can be scoped to the group.
+    let (status, _) = post_json(
+        &proxy,
+        &cookie,
+        "/api/settings/nim-keys",
+        serde_json::json!({"add": {"key": "custom-key-1", "upstream": "custom"}}),
+    )
+    .await;
+    assert_eq!(status, 200);
+    let (status, body) = post_json(
+        &proxy,
+        &cookie,
+        "/api/settings/nim-keys",
+        serde_json::json!({"add": {"key": "custom-key-2", "upstream": "nope"}}),
+    )
+    .await;
+    assert_eq!(status, 400, "unknown group: {body}");
+
+    // Probing against the group's own base URL works.
+    let (status, body) = post_json(
+        &proxy,
+        &cookie,
+        "/api/settings/validate-key",
+        serde_json::json!({"key": "custom-key-1", "upstream": "custom"}),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["ok"], true);
+    let (status, _) = post_json(
+        &proxy,
+        &cookie,
+        "/api/settings/validate-key",
+        serde_json::json!({"key": "custom-key-1", "upstream": "nope"}),
+    )
+    .await;
+    assert_eq!(status, 400);
+
+    // The pinned model is served with the group's key.
+    let resp = client()
+        .post(proxy.url("/v1/chat/completions"))
+        .json(&chat_with_model("custom/model"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    assert!(mock.state.hit_keys().contains(&"custom-key-1".to_owned()));
+
+    // Toggling the model off rejects before queueing...
+    let (status, _) = post_json(
+        &proxy,
+        &cookie,
+        "/api/settings/models",
+        serde_json::json!({"disabled": ["custom/model"]}),
+    )
+    .await;
+    assert_eq!(status, 200);
+    let before = mock.state.hit_count();
+    let resp = client()
+        .post(proxy.url("/v1/chat/completions"))
+        .json(&chat_with_model("custom/model"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 404);
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(body["error"]["code"], "model_disabled");
+    assert_eq!(mock.state.hit_count(), before);
+
+    // ... and toggling it back on serves again.
+    let (status, _) = post_json(
+        &proxy,
+        &cookie,
+        "/api/settings/models",
+        serde_json::json!({"disabled": []}),
+    )
+    .await;
+    assert_eq!(status, 200);
+    let resp = client()
+        .post(proxy.url("/v1/chat/completions"))
+        .json(&chat_with_model("custom/model"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+
+    // Disabling the whole group parks it: the pinned model has nowhere to
+    // go (the primary is a catch-all, so it serves as fallback).
+    let (status, _) = post_json(
+        &proxy,
+        &cookie,
+        "/api/settings/upstreams",
+        serde_json::json!({"set": {"name": "custom", "enabled": false}}),
+    )
+    .await;
+    assert_eq!(status, 200);
+    let resp = client()
+        .post(proxy.url("/v1/chat/completions"))
+        .json(&chat_with_model("custom/model"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+
+    // Removing the group drops its keys from the pool.
+    let (status, body) = post_json(
+        &proxy,
+        &cookie,
+        "/api/settings/upstreams",
+        serde_json::json!({"remove": "custom"}),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    let cfg = api_config(&proxy, &cookie).await;
+    assert!(
+        cfg["upstreams"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|g| g["name"] != "custom"),
+        "group removed: {cfg}"
+    );
+    assert!(
+        cfg["nim_keys"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|k| k["upstream"] != "custom"),
+        "group keys removed: {cfg}"
+    );
+
+    // The primary group can never be removed, only disabled.
+    let (status, _) = post_json(
+        &proxy,
+        &cookie,
+        "/api/settings/upstreams",
+        serde_json::json!({"remove": "nvidia"}),
+    )
+    .await;
+    assert_eq!(status, 400);
 }

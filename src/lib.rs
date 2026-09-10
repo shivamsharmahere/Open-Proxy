@@ -60,7 +60,16 @@ const HISTOGRAM_BUCKETS: &[(&str, &[f64])] = &[
 /// takes one `Arc<Config>` via [`AppState::cfg`] and sees a consistent view;
 /// the settings layer swaps in a replacement under the write lock.
 pub struct Config {
+    /// Primary group's base URL (kept for logs, the setup probe default,
+    /// and single-upstream callers). The request path sends to the slot's
+    /// own `base_url`, which may be another group's compatible API.
     pub base_url: String,
+    /// Every endpoint group in stored order (index 0 is always `nvidia`).
+    /// Indexes here are the `endpoint` tags on pool lanes.
+    pub endpoints: Vec<EndpointRuntime>,
+    /// Globally toggled-off models: hidden from the merged catalog and
+    /// rejected before queueing.
+    pub disabled_models: Vec<String>,
     pub max_wait: Duration,
     pub heartbeat: Duration,
     pub models_ttl: Duration,
@@ -78,6 +87,46 @@ pub struct Config {
     pub max_inflight: usize,
     /// Model-pressure governor settings (worker concurrency, not RPM).
     pub governor: GovernorSettings,
+}
+
+/// One endpoint group as the request path sees it.
+pub struct EndpointRuntime {
+    pub name: String,
+    pub base_url: String,
+    pub enabled: bool,
+    /// Model allowlist; empty serves any model.
+    pub models: Vec<String>,
+}
+
+impl Config {
+    /// Endpoint groups that may serve `model`: enabled, allowlisted (or
+    /// catch-all), and — when the model is globally toggled off — none.
+    /// Returns the endpoint indexes for the pool filter. `None` means the
+    /// model itself is disabled; `Some(vec![])` means no group carries it.
+    pub fn route_model(&self, model: &str) -> Option<Vec<usize>> {
+        if self.disabled_models.iter().any(|m| m == model) {
+            return None;
+        }
+        let mut specific = Vec::new();
+        let mut catch_all = Vec::new();
+        for (i, ep) in self.endpoints.iter().enumerate() {
+            if !ep.enabled {
+                continue;
+            }
+            if ep.models.is_empty() {
+                catch_all.push(i);
+            } else if ep.models.iter().any(|m| m == model) {
+                specific.push(i);
+            }
+        }
+        if specific.is_empty() {
+            Some(catch_all)
+        } else {
+            // A specifically-listed group wins over catch-alls so a pinned
+            // model never spills onto the generic pool by accident.
+            Some(specific)
+        }
+    }
 }
 
 pub struct GovernorSettings {
@@ -427,10 +476,10 @@ async fn security_headers(
 }
 
 const BANNER: &str = r#"
-     _  _ ___ __  __   ___ ___  _____  ____   __
-    | \| |_ _|  \/  | | _ \ _ \/ _ \ \/ /\ \ / /
-    | .` || || |\/| | |  _/   / (_) >  <  \ V /
-    |_|\_|___|_|  |_| |_| |_|_\\___/_/\_\  |_|
+   ___  ___ ___ _  _   ___ ___  _____  ____   __
+  / _ \| _ \ __| \| | | _ \ _ \/ _ \ \/ /\ \ / /
+ | (_) |  _/ _|| .` | |  _/   / (_) >  <  \ V /
+  \___/|_| |___|_|\_| |_| |_|_\\___/_/\_\  |_|
 "#;
 
 /// `nim-proxy --health`: probe our own /health endpoint and exit 0/1.
@@ -466,7 +515,7 @@ pub async fn run() {
         .with_ansi(std::io::IsTerminal::is_terminal(&std::io::stdout()))
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "nim_proxy=info".into()),
+                .unwrap_or_else(|_| "open_proxy=info".into()),
         )
         .init();
 
@@ -516,6 +565,14 @@ pub async fn run() {
         config::store_path(&data_dir).display()
     );
     tracing::info!("upstream          {}", cfg.base_url);
+    for ep in cfg.endpoints.iter().skip(1) {
+        tracing::info!(
+            "upstream {:<10} {} ({})",
+            ep.name,
+            ep.base_url,
+            if ep.enabled { "enabled" } else { "disabled" }
+        );
+    }
     let pool_specs = stored.pool_specs();
     tracing::info!(
         "lanes             {} enabled key(s), {} rpm aggregate",
@@ -658,6 +715,8 @@ pub async fn run() {
         .route(routes::API_SETTINGS_NIM_KEYS, post(settings::nim_keys))
         .route(routes::API_SETTINGS_CLIENTS, post(settings::clients))
         .route(routes::API_SETTINGS_UPSTREAM, post(settings::upstream))
+        .route(routes::API_SETTINGS_UPSTREAMS, post(settings::upstreams))
+        .route(routes::API_SETTINGS_MODELS, post(settings::models_cfg))
         .route(routes::API_SETTINGS_LIMITS, post(settings::limits))
         .route(routes::API_SETTINGS_SERVER, post(settings::server))
         .route(routes::API_SETTINGS_HISTORY, post(settings::history))
@@ -754,6 +813,68 @@ pub async fn run() {
     let _ = sampler_shutdown.send(true);
     sampler.await.expect("history sampler task");
     server.expect("server");
+}
+
+#[cfg(test)]
+mod route_model_tests {
+    use super::*;
+
+    fn cfg() -> Config {
+        Config {
+            base_url: "https://primary.invalid".into(),
+            endpoints: vec![
+                EndpointRuntime {
+                    name: "nvidia".into(),
+                    base_url: "https://primary.invalid".into(),
+                    enabled: true,
+                    models: vec![],
+                },
+                EndpointRuntime {
+                    name: "openai".into(),
+                    base_url: "https://openai.invalid".into(),
+                    enabled: true,
+                    models: vec!["org/gpt-4".into()],
+                },
+                EndpointRuntime {
+                    name: "off".into(),
+                    base_url: "https://off.invalid".into(),
+                    enabled: false,
+                    models: vec![],
+                },
+            ],
+            disabled_models: vec!["banned/model".into()],
+            max_wait: Duration::from_secs(1),
+            heartbeat: Duration::from_secs(1),
+            models_ttl: Duration::from_secs(1),
+            stream_idle: Duration::from_secs(1),
+            request_timeout: Duration::from_secs(1),
+            strict_passthrough: false,
+            clients: None,
+            max_inflight: 1,
+            governor: GovernorSettings::default(),
+        }
+    }
+
+    #[test]
+    fn disabled_models_route_nowhere() {
+        assert_eq!(cfg().route_model("banned/model"), None);
+    }
+
+    #[test]
+    fn pinned_model_routes_only_to_its_group() {
+        assert_eq!(cfg().route_model("org/gpt-4"), Some(vec![1]));
+    }
+
+    #[test]
+    fn unlisted_model_routes_to_catch_all_groups() {
+        // Endpoint 1 allowlists only org/gpt-4 and endpoint 2 is disabled.
+        assert_eq!(cfg().route_model("other/model"), Some(vec![0]));
+    }
+
+    #[test]
+    fn model_less_requests_use_catch_all_groups() {
+        assert_eq!(cfg().route_model("none"), Some(vec![0]));
+    }
 }
 
 #[cfg(test)]

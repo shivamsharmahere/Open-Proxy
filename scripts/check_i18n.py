@@ -31,7 +31,7 @@ import sys
 from html.parser import HTMLParser
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-EMERGENCY_TEXT = "NIM Proxy interface failed to load."
+EMERGENCY_TEXT = "Open Proxy interface failed to load."
 STANDARD_VOCABULARY = ROOT / "knowledge/decisions/standard-vocabulary.md"
 PAGE_SOURCES = {
     "src/web/dashboard.html": (

@@ -95,6 +95,8 @@ function showSecret(name, secret) {
 
 function renderAccess() {
   const admin = !!SET.users;
+  const groups = SET.upstreams || [];
+  const groupChip = g => ` <span class="tag">${escapeHtml(g)}</span>`;
   const ownerChip = o => admin ? ` <span class="tag">${escapeHtml(o)}</span>` : '';
   const validatedModelsId = n => {
     switch (PLURALS.select(n)) {
@@ -110,7 +112,7 @@ function renderAccess() {
     const st = keyState(k);
     return `<div class="krow${k.enabled ? '' : ' koff'}">
       <div data-style="min-width:0">
-        <div class="kmask">nvapi-••••${escapeHtml(k.last4)}${ownerChip(k.owner)}</div>
+        <div class="kmask">nvapi-••••${escapeHtml(k.last4)}${ownerChip(k.owner)}${groupChip(k.upstream || 'nvidia')}</div>
         <div class="kmeta">fp ${escapeHtml(String(k.fingerprint).slice(0, 8))} · ${k.lane != null ? escapeHtml(catalogMessage('settings.key.slot', { n: NUM_GROUPED.format(+k.lane + 1) })) : k.enabled ? escapeHtml(catalogMessage('settings.key.state.unassigned')) : escapeHtml(catalogMessage('settings.key.off'))}</div>
       </div>
       <span class="${st.cls}" data-ksfp="${escapeHtml(k.fingerprint)}">${escapeHtml(catalogMessage(st.id, st.params))}</span>
@@ -128,13 +130,71 @@ function renderAccess() {
       ${admin ? `<span class="tag">${escapeHtml(ck.owner)}</span>` : ''}
       <button class="dbtn" data-style="margin-left:auto" data-ckdel="${i}" data-i18n="settings.client_key.revoke"></button>
     </div>`).join('');
+  const groupOptions = groups.map(g =>
+    `<option value="${escapeHtml(g.name)}">${escapeHtml(g.name)}</option>`).join('');
+  const groupKeyCount = n => {
+    const params = { n: NUM_GROUPED.format(n) };
+    switch (PLURALS.select(n)) {
+      case 'zero': return catalogMessage('settings.upstream.key_count.zero', params);
+      case 'one': return catalogMessage('settings.upstream.key_count.one', params);
+      case 'two': return catalogMessage('settings.upstream.key_count.two', params);
+      case 'few': return catalogMessage('settings.upstream.key_count.few', params);
+      case 'many': return catalogMessage('settings.upstream.key_count.many', params);
+      default: return catalogMessage('settings.upstream.key_count.other', params);
+    }
+  };
+  const upstreamCard = `
+    <div class="card mb">
+      <h2><span data-i18n="settings.upstream.heading"></span> <span class="note" data-i18n="settings.upstream.note"></span></h2>
+      <p class="shint" data-i18n="settings.upstream.help"></p>
+      <div>${groups.map((g, i) => {
+        const allow = (g.models && g.models.length)
+          ? g.models.map(m => `<span class="ochip"><span title="${escapeHtml(m)}">${escapeHtml(m)}</span></span>`).join('')
+          : '<span class="kmeta" data-i18n="settings.upstream.any_model"></span>';
+        return `<div class="krow${g.enabled ? '' : ' koff'}">
+          <div data-style="min-width:0">
+            <div data-style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(g.name)}</div>
+            <div class="kmeta" data-style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(g.base_url)} · ${escapeHtml(groupKeyCount(+g.keys))}</div>
+            <div data-style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px">${allow}</div>
+            ${admin ? `<div class="addrow" data-style="margin-top:8px">
+              <input class="sin" data-style="flex:1;min-width:200px" data-upmodels="${i}" value="${escapeHtml((g.models || []).join(', '))}" data-i18n-attr="placeholder:settings.upstream.models_placeholder">
+              <button class="gbtn" data-upsave="${i}" data-i18n="settings.common.save"></button>
+            </div>` : ''}
+          </div>
+          ${admin ? `<button class="tog" type="button" aria-pressed="${!!g.enabled}" data-uptog="${i}" data-i18n-attr="title:${g.enabled ? 'settings.upstream.toggle.disable' : 'settings.upstream.toggle.enable'},aria-label:${g.enabled ? 'settings.upstream.toggle.disable' : 'settings.upstream.toggle.enable'}"></button>` : ''}
+          ${admin && g.name !== 'nvidia' ? `<button class="dbtn icon" data-updel="${i}" data-i18n-attr="title:settings.upstream.remove">${TRASH}</button>` : ''}
+        </div>`;
+      }).join('') || '<div class="empty" data-i18n="settings.upstream.empty"></div>'}</div>
+      ${admin ? `<div class="addrow">
+        <input id="up-name" class="sin" data-style="flex:1;min-width:120px" maxlength="64" data-i18n-attr="placeholder:settings.upstream.name_placeholder" autocomplete="off" spellcheck="false">
+        <input id="up-url" class="sin" data-style="flex:2;min-width:200px" data-i18n-attr="placeholder:settings.upstream.url_placeholder" autocomplete="off" spellcheck="false">
+        <input id="up-models" class="sin" data-style="flex:2;min-width:200px" data-i18n-attr="placeholder:settings.upstream.models_placeholder" autocomplete="off" spellcheck="false">
+        <button class="pbtn" id="up-add" data-i18n="settings.upstream.add"></button>
+      </div>
+      <div class="serr" id="up-err"></div>` : ''}
+    </div>`;
+  const modelsCard = `
+    <div class="card mb">
+      <h2><span data-i18n="settings.models.heading"></span></h2>
+      <p class="shint" data-i18n="settings.models.help"></p>
+      <div>${(SET.disabled_models || []).map((m, i) =>
+        `<span class="ochip"><span title="${escapeHtml(m)}">${escapeHtml(m)}</span>${admin ? `<button data-mddel="${i}" data-i18n-attr="title:settings.models.reenable">×</button>` : ''}</span>`).join('')
+        || '<span class="kmeta" data-i18n="settings.models.empty"></span>'}</div>
+      ${admin ? `<div class="addrow" data-style="margin-top:8px">
+        <input id="md-name" class="sin" data-style="flex:1;min-width:200px" maxlength="128" data-i18n-attr="placeholder:settings.models.placeholder,aria-label:settings.models.heading" autocomplete="off" spellcheck="false">
+        <button class="pbtn" id="md-add" data-i18n="settings.models.disable"></button>
+      </div>
+      <div class="serr" id="md-err"></div>` : ''}
+    </div>`;
   $('setbody').innerHTML = `
+    ${upstreamCard}
     <div class="card mb">
       <h2><span data-i18n="${admin ? 'settings.key.heading.all' : 'settings.key.heading.mine'}"></span> <span class="note" id="pool-note">${escapeHtml(catalogMessage('settings.key.pool_note', { enabled: NUM_GROUPED.format(+SET.pool.enabled), capacity: NUM_GROUPED.format(+SET.pool.capacity_rpm) }))}</span></h2>
       <p class="shint" data-i18n="${admin ? 'settings.key.notice.admin' : 'settings.key.notice.mine'}"></p>
       <div>${keyRows || '<div class="empty" data-i18n="settings.key.empty"></div>'}</div>
       <div class="addrow">
         <input id="nk-key" class="sin" data-style="flex:1;min-width:200px" type="password" data-i18n-attr="placeholder:settings.key.placeholder,aria-label:settings.key.placeholder" autocomplete="off" spellcheck="false">
+        <select id="nk-upstream" class="sin" data-style="flex:0 1 140px" data-i18n-attr="aria-label:settings.key.group">${groupOptions}</select>
         <span class="rpmwrap"><input id="nk-rpm" class="sin num" type="number" min="1" max="10000" value="40" data-i18n-attr="aria-label:settings.key.rpm"><span class="unitl">rpm</span></span>
         <button class="pbtn" id="nk-add" data-i18n="settings.key.validate_add"></button>
         <button class="gbtn" id="nk-force" hidden data-i18n="settings.key.add_anyway"></button>
@@ -150,6 +210,7 @@ function renderAccess() {
       </div>
       <div class="serr" id="ck-err"></div>
     </div>
+    ${modelsCard}
     <div class="card">
       <h2 data-i18n="settings.connection.heading"></h2>
       <div class="congrid">
@@ -159,13 +220,20 @@ function renderAccess() {
         </div>
         <div class="conbox">
           <div class="slabel" data-i18n="settings.mode.heading"></div>
-          <div class="kmask" data-style="color:${SET.mode === 'keyed' ? 'var(--green-lt)' : 'var(--amber-lt)'}">● <span data-i18n="${SET.mode === 'keyed' ? 'settings.mode.keyed' : 'settings.mode.open'}"></span></div>
+          <div class="kmask" data-style="color:${SET.mode === 'keyed' ? 'var(--accent-lt)' : 'var(--amber-lt)'}">● <span data-i18n="${SET.mode === 'keyed' ? 'settings.mode.keyed' : 'settings.mode.open'}"></span></div>
           <div class="kmeta" data-style="margin-top:4px" data-i18n="${SET.mode === 'keyed' ? 'settings.mode.keyed_note' : 'settings.mode.open_note'}"></div>
         </div>
       </div>
     </div>`;
   const body = $('setbody');
   applyStatic(body);
+  /* Accessible names for the group form (placeholder-only markup above keeps
+     one localizable attribute per element for the catalog lint). */
+  if ($('up-name')) setMessageAttr($('up-name'), 'aria-label', 'settings.upstream.name');
+  if ($('up-url')) setMessageAttr($('up-url'), 'aria-label', 'settings.upstream.base_url');
+  if ($('up-models')) setMessageAttr($('up-models'), 'aria-label', 'settings.upstream.models');
+  for (const el of body.querySelectorAll('[data-upmodels]'))
+    setMessageAttr(el, 'aria-label', 'settings.upstream.models');
   for (const el of body.querySelectorAll('[data-rpm]')) el.addEventListener('change', async () => {
     const k = SET.nim_keys[+el.dataset.rpm];
     try {
@@ -187,8 +255,12 @@ function renderAccess() {
     catch (e) { note('nk-err', e.message); }
   });
   /* validate first; "Add anyway" appears only after a failed probe */
+  const selectedUpstream = () => {
+    const el = $('nk-upstream');
+    return el && el.value ? el.value : 'nvidia';
+  };
   const addKey = async () => {
-    await sPost('/api/settings/nim-keys', { add: { key: $('nk-key').value.trim(), rpm: clampInt($('nk-rpm').value, 1, 10000, 40) } });
+    await sPost('/api/settings/nim-keys', { add: { key: $('nk-key').value.trim(), rpm: clampInt($('nk-rpm').value, 1, 10000, 40), upstream: selectedUpstream() } });
     await loadSettings();
   };
   $('nk-add').addEventListener('click', async () => {
@@ -196,7 +268,7 @@ function renderAccess() {
     if (!key) return noteMessage('nk-err', 'settings.validation.nim_key_required');
     $('nk-add').disabled = true; setMessageText($('nk-add'), 'settings.key.validating');
     try {
-      const v = await sPost('/api/settings/validate-key', { key });
+      const v = await sPost('/api/settings/validate-key', { key, upstream: selectedUpstream() });
       const count = Array.isArray(v.models) ? v.models.length : +v.models;
       await addKey();
       noteMessage('nk-err', validatedModelsId(count), { n: NUM_GROUPED.format(count) }, true);
@@ -227,6 +299,51 @@ function renderAccess() {
     } catch (e) { note('ck-err', e.message); }
   });
   $('copy-base').addEventListener('click', () => copyText(location.origin + '/v1', $('copy-base')));
+  const parseModels = raw => raw.split(',').map(m => m.trim()).filter(m => m.length > 0);
+  for (const el of body.querySelectorAll('[data-uptog]')) el.addEventListener('click', async () => {
+    const g = groups[+el.dataset.uptog];
+    try {
+      await sPost('/api/settings/upstreams', { set: { name: g.name, enabled: !g.enabled } });
+      await loadSettings();
+    } catch (e) { note('up-err', e.message); }
+  });
+  for (const el of body.querySelectorAll('[data-upsave]')) el.addEventListener('click', async () => {
+    const g = groups[+el.dataset.upsave];
+    const input = body.querySelector(`[data-upmodels="${+el.dataset.upsave}"]`);
+    try {
+      await sPost('/api/settings/upstreams', { set: { name: g.name, models: parseModels(input ? input.value : '') } });
+      await loadSettings();
+    } catch (e) { note('up-err', e.message); }
+  });
+  for (const el of body.querySelectorAll('[data-updel]')) el.addEventListener('click', async () => {
+    const g = groups[+el.dataset.updel];
+    if (!confirmMessage('settings.dialog.remove_group', { name: g.name })) return;
+    try { await sPost('/api/settings/upstreams', { remove: g.name }); await loadSettings(); }
+    catch (e) { note('up-err', e.message); }
+  });
+  if ($('up-add')) $('up-add').addEventListener('click', async () => {
+    const name = $('up-name').value.trim(), base_url = $('up-url').value.trim();
+    if (!name || !base_url) return noteMessage('up-err', 'settings.validation.upstream_required');
+    try {
+      await sPost('/api/settings/upstreams', { add: { name, base_url, models: parseModels($('up-models').value) } });
+      await loadSettings();
+    } catch (e) { note('up-err', e.message); }
+  });
+  if ($('md-add')) $('md-add').addEventListener('click', async () => {
+    const model = $('md-name').value.trim();
+    if (!model) return noteMessage('md-err', 'settings.validation.model_required');
+    try {
+      await sPost('/api/settings/models', { disabled: [...(SET.disabled_models || []), model] });
+      await loadSettings();
+    } catch (e) { note('md-err', e.message); }
+  });
+  for (const el of body.querySelectorAll('[data-mddel]')) el.addEventListener('click', async () => {
+    const disabled = (SET.disabled_models || []).filter((_, i) => i !== +el.dataset.mddel);
+    try {
+      await sPost('/api/settings/models', { disabled });
+      await loadSettings();
+    } catch (e) { note('md-err', e.message); }
+  });
 }
 
 function renderServer() {

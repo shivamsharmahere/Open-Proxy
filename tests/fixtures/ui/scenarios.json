@@ -7,6 +7,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -19,7 +20,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -30,7 +32,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -68,6 +71,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -92,6 +104,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -104,7 +117,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -115,7 +129,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -153,6 +168,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -177,6 +201,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -189,7 +214,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -200,7 +226,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -238,6 +265,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -262,6 +298,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "open",
     "nim_keys": [
@@ -274,7 +311,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -285,7 +323,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -323,6 +362,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -341,6 +389,7 @@
   },
   "client-create-before": {
     "client_keys": [],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -353,7 +402,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -364,7 +414,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -402,6 +453,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -426,6 +486,7 @@
         "owner": "fixture-superuser"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -438,7 +499,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -449,7 +511,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -487,6 +550,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -505,6 +577,7 @@
   },
   "client-deleted-after": {
     "client_keys": [],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -517,7 +590,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -528,7 +602,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -566,6 +641,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -7564,6 +7648,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -7576,7 +7661,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -7587,7 +7673,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -7625,6 +7712,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -7649,6 +7745,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -7661,7 +7758,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -7672,7 +7770,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -7710,6 +7809,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -7734,6 +7842,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -7746,7 +7855,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -7757,7 +7867,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -7795,6 +7906,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -7819,6 +7939,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -7831,7 +7952,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -7842,7 +7964,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -7880,6 +8003,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -7904,6 +8036,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -7916,7 +8049,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -7927,7 +8061,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -7965,6 +8100,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -7989,6 +8133,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -8001,7 +8146,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -8012,7 +8158,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -8050,6 +8197,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -8074,6 +8230,7 @@
         "owner": "user-fixture-uuuuuuuuuuuuuuuuuuu"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -8086,7 +8243,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "user-fixture-uuuuuuuuuuuuuuuuuuu",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -8097,7 +8255,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -8135,6 +8294,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -8159,6 +8327,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -8171,7 +8340,8 @@
         "lane": 0,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -8209,6 +8379,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -8233,6 +8412,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -8245,7 +8425,8 @@
         "lane": 0,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -8256,7 +8437,8 @@
         "lane": 1,
         "last4": "wxyz",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -8294,6 +8476,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -8318,6 +8509,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -8330,7 +8522,8 @@
         "lane": 0,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -8368,6 +8561,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -8392,6 +8594,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -8404,7 +8607,8 @@
         "lane": null,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -8415,7 +8619,8 @@
         "lane": 0,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -8453,6 +8658,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -8477,6 +8691,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -8489,7 +8704,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 41
+        "rpm": 41,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -8500,7 +8716,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -8538,6 +8755,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -8562,6 +8788,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -8574,7 +8801,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -8585,7 +8813,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -8621,6 +8850,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -8645,6 +8883,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -8657,7 +8896,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -8668,7 +8908,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -8706,6 +8947,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -8730,6 +8980,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -8742,7 +8993,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -8753,7 +9005,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -8791,6 +9044,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -8815,6 +9077,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -8827,7 +9090,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -8838,7 +9102,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -8874,6 +9139,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -8899,6 +9173,7 @@
   },
   "users-create-before": {
     "client_keys": [],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -8911,7 +9186,8 @@
         "lane": 0,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -8949,6 +9225,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -8961,6 +9246,7 @@
   },
   "users-created-after": {
     "client_keys": [],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -8973,7 +9259,8 @@
         "lane": 0,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -9011,6 +9298,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -9035,6 +9331,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -9047,7 +9344,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -9058,7 +9356,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -9096,6 +9395,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -9114,6 +9422,7 @@
   },
   "users-deleted-after": {
     "client_keys": [],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -9126,7 +9435,8 @@
         "lane": 0,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -9164,6 +9474,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -9182,6 +9501,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -9194,7 +9514,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -9205,7 +9526,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -9243,6 +9565,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {
@@ -9267,6 +9598,7 @@
         "owner": "fixture-user"
       }
     ],
+    "disabled_models": [],
     "locale": "en-US",
     "mode": "keyed",
     "nim_keys": [
@@ -9279,7 +9611,8 @@
         "lane": 0,
         "last4": "wxyz",
         "owner": "fixture-user",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       },
       {
         "cooldown_ms": 0,
@@ -9290,7 +9623,8 @@
         "lane": 1,
         "last4": "root",
         "owner": "fixture-superuser",
-        "rpm": 40
+        "rpm": 40,
+        "upstream": "nvidia"
       }
     ],
     "pool": {
@@ -9328,6 +9662,15 @@
         "strict_passthrough": false
       }
     },
+    "upstreams": [
+      {
+        "base_url": "https://integrate.api.nvidia.com",
+        "enabled": true,
+        "keys": 2,
+        "models": [],
+        "name": "nvidia"
+      }
+    ],
     "username": "fixture-superuser",
     "users": [
       {

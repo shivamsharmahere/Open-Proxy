@@ -255,7 +255,7 @@ pub async fn setup_submit(State(state): State<Arc<AppState>>, req: Request) -> R
             let groups = &req.groups;
             let first = &groups[0];
             if !first.base_url.is_empty() {
-                cand.upstream.base_url = first.base_url.trim().trim_end_matches('/').to_owned();
+                cand.upstream.base_url = config::Upstream::normalize_base_url(first.base_url.trim());
             }
             for k in &first.keys {
                 cand.upstream.nim_keys.push(NimKey {
@@ -272,7 +272,7 @@ pub async fn setup_submit(State(state): State<Arc<AppState>>, req: Request) -> R
                 }
                 cand.upstreams.push(config::UpstreamEndpoint {
                     name,
-                    base_url: group.base_url.trim().trim_end_matches('/').to_owned(),
+                    base_url: config::Upstream::normalize_base_url(group.base_url.trim()),
                     enabled: true,
                     keys: group
                         .keys
@@ -992,7 +992,7 @@ pub async fn upstream(
             None => return stale_session(),
         }
         let mut cand = guard.clone();
-        cand.upstream.base_url = req.base_url.trim().trim_end_matches('/').to_owned();
+        cand.upstream.base_url = config::Upstream::normalize_base_url(req.base_url.trim());
         commit(&state, &mut guard, cand)
     };
     match result {
@@ -1091,7 +1091,7 @@ pub async fn upstreams(
                         cand.upstream.enabled = e;
                     }
                     if let Some(b) = set.base_url {
-                        cand.upstream.base_url = b.trim().trim_end_matches('/').to_owned();
+            cand.upstream.base_url = config::Upstream::normalize_base_url(b.trim());
                     }
                     if let Some(m) = set.models {
                         cand.upstream.models = m;
@@ -1239,8 +1239,8 @@ pub async fn server(
             None => return stale_session(),
         }
         let mut cand = guard.clone();
-        let upstream_changed = cand.upstream.base_url != req.base_url.trim().trim_end_matches('/');
-        cand.upstream.base_url = req.base_url.trim().trim_end_matches('/').to_owned();
+        let upstream_changed = cand.upstream.base_url != config::Upstream::normalize_base_url(req.base_url.trim());
+        cand.upstream.base_url = config::Upstream::normalize_base_url(req.base_url.trim());
         replace_limits(&mut cand, req.limits);
         commit(&state, &mut guard, cand).map(|()| upstream_changed)
     };

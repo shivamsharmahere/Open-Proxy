@@ -95,7 +95,9 @@ surfaces is unchanged and must not be relied upon for new longer strings.
 
 ## Color
 
-**Frozen — Phase 2 (Theme Tokens + Toggle) owns all color work. No color changes in this phase.**
+> SUPERSESSION NOTE 2026-09-05: owner switched Phase 2 from the orange dual-theme to graphite + violet + cyan (see REQUIREMENTS.md Scope Deltas). References below to "Phase 2 relocks to orange" now mean "Phase 2 applies the violet identity". This phase's frozen-color rule is unaffected.
+
+**Frozen — Phase 2 (Violet Theme Tokens) owns all color work. No color changes in this phase.**
 
 | Role | Value | Usage |
 |------|-------|-------|

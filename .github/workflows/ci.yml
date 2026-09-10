@@ -557,7 +557,7 @@ jobs:
         with:
           context: .
           load: true
-          tags: nim-proxy:ci
+          tags: open-proxy:ci
           cache-from: type=gha,scope=ci
           cache-to: type=gha,mode=max,scope=ci
       - name: Smoke test image
@@ -565,7 +565,7 @@ jobs:
           # A fresh container boots into setup-required mode (no env config
           # since v0.6.0); /health is public regardless, and the built-in
           # HEALTHCHECK must go healthy on it.
-          docker run -d --name smoke -p 8000:8000 nim-proxy:ci
+          docker run -d --name smoke -p 8000:8000 open-proxy:ci
           ok=0
           for _ in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:8000/health > /dev/null 2>&1; then ok=1; break; fi

@@ -6,6 +6,21 @@ description: Append-only record of ingests, decisions, and maintenance passes.
 
 # Log
 
+## [2026-09-04] feature — multi-upstream endpoint groups with model routing
+
+Proxy now fronts several OpenAI-compatible APIs (primary `nvidia` group plus
+named extra groups), routing by model name with per-group allowlists and a
+global disabled-model toggle (`model_disabled` / `model_not_found` fail fast
+without spending rate budget; merged `/v1/models` minus disabled). New admin
+APIs `POST /api/settings/upstreams` + `POST /api/settings/models`;
+`/api/config` gains `upstreams`, `disabled_models`, per-key `upstream`.
+Additive schema: pre-change stores load as one enabled catch-all group.
+Proof: `cargo test` 228 lib + 124 e2e (5 new) + 8 openapi green;
+`cargo fmt --check`, `cargo clippy --all-targets`, `check_i18n.py`, and
+`locale_v1.py --all` clean; UI fixtures + `openapi.json` regenerated.
+Durable note in [architecture/multi-upstream](architecture/multi-upstream.md);
+[key-pool](architecture/key-pool.md) carrier/floor wording updated.
+
 ## [2026-08-24] maintenance — reconcile governing documentation
 
 Contributor guidance now describes the split embedded presentation layer and

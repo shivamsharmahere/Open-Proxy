@@ -1,17 +1,17 @@
-# Milestone v1 Requirements — OPENPROXY Rebrand & Dual-Theme Console
+# Milestone v1 Requirements — OPENPROXY Rebrand & Violet Console
 
 ## Copy rebrand (provider-neutral)
 
-- [ ] **COPY-01**: Wizard copy is provider-neutral — first-time setup never names NVIDIA-only key flows; generic "API key" + provider-group wording throughout steps 1–4.
-- [ ] **COPY-02**: Dashboard/settings copy sweep — every user-visible NIM-specific string (keys, validation, users, hints) reworded provider-neutral; no screen contradicts multi-provider reality.
-- [ ] **COPY-03**: Catalog hashes + fixtures regenerated — every edited `en` gets fresh `sha256(en)[:8]`, public projection regenerated, `check_i18n.py` + `locale_v1 --all` green, no new em-dashes.
+- [x] **COPY-01**: Wizard copy is provider-neutral — first-time setup never names NVIDIA-only key flows; generic "API key" + provider-group wording throughout steps 1–4. _(Phase 1 plans 01-01/01-02, 2026-09-05)_
+- [x] **COPY-02**: Dashboard/settings copy sweep — every user-visible NIM-specific string (keys, validation, users, hints) reworded provider-neutral; no screen contradicts multi-provider reality. _(Phase 1 plans 01-01/01-02, 2026-09-05)_
+- [x] **COPY-03**: Catalog hashes + fixtures regenerated — every edited `en` gets fresh `sha256(en)[:8]`, public projection regenerated, `check_i18n.py` + `locale_v1 --all` green, no new em-dashes. _(Phase 1 plans 01-01/01-02, 2026-09-05)_
 
-## Dual theme
+## Theme (violet)
 
-- [ ] **THEME-01**: Token split — `:root` dark defaults + `[data-theme="light"]` creamy overrides in `operator.css`/`public.css`; components reference semantic tokens only.
-- [ ] **THEME-02**: Palette pairs — orange-on-black dark and deep-orange-on-cream light, each text/background pair at WCAG AA; single accent locked everywhere.
-- [ ] **THEME-03**: Toggle + memory — visible toggle, persisted in browser, OS setting as default, no first-paint flash within the CSP external-scripts-only constraint; reduced-motion gate preserved.
-- [ ] **THEME-04**: Icon recolor — product mark follows the orange identity (shape unchanged).
+- [x] **THEME-01**: Token split — `:root` graphite/violet dark tokens in `operator.css`/`public.css`; components reference semantic tokens only. (Dark-only per 2026-09-05 decision; no light token set.)
+- [x] **THEME-02**: Palette pairs — graphite surfaces + violet primary + cyan secondary + emerald/amber/red semantic colors (SCOPE DELTA 2026-09-05: supersedes orange-on-black/cream; vanilla CSS vars, no Tailwind; data-driven chart colors, no per-model hardcoding, no Dollars-Saved card)
+- [ ] ~~**THEME-03**: Toggle + memory~~ — DROPPED 2026-09-05 (dark-only console; no second theme to toggle to)
+- [x] **THEME-04**: Icon recolor — product mark follows the violet identity (shape unchanged; SCOPE DELTA 2026-09-05: supersedes orange identity)
 
 ## Multi-provider setup
 
@@ -22,9 +22,15 @@
 
 ## Verification
 
-- [ ] **VER-01**: Both-theme signup-to-first-call pass — fresh container, claim with 2 providers, proxied call served, theme toggled mid-flow without breakage.
-- [ ] **VER-02**: Screenshots — setup, login, dashboard, settings captured in both themes and archived.
+- [ ] **VER-01**: Signup-to-first-call pass — fresh container, claim with 2 providers, proxied call served, no breakage.
+- [ ] **VER-02**: Screenshots — setup, login, dashboard, settings captured (dark console) and archived.
 - [ ] **VER-03**: Image rebuilt — `docker build -t open-proxy .` from the final tree, `/health` + wizard smoke green.
+
+## Scope Deltas
+
+- **2026-09-05 — violet theme switch.** Owner replaced the orange dual-theme plan with the graphite + violet primary + cyan secondary + semantic status colors proposal. Adaptations vs the proposal as pasted: vanilla CSS custom properties (no Tailwind — Ponytail: existing `operator.css`/`public.css` token system does it); OPENPROXY naming (not "NIM Proxy"); no Dollars-Saved KPI (metric deliberately deleted); chart colors data-driven by series, not hardcoded per model id. Cascade resolved same day: dark-only console (THEME-03 dropped; THEME-01 dark tokens only; VER-01/02 single-theme).
+
+- **2026-09-05 — dark-only resolution.** Owner dropped the light theme + toggle: console stays dark-only (as today). THEME-03 dropped; THEME-01 is dark tokens only; VER-01/02 are single-theme (dark) passes.
 
 ## Future Requirements (deferred)
 
@@ -44,13 +50,13 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| COPY-01 | Phase 1 | Pending |
-| COPY-02 | Phase 1 | Pending |
-| COPY-03 | Phase 1 | Pending |
-| THEME-01 | Phase 2 | Pending |
-| THEME-02 | Phase 2 | Pending |
-| THEME-03 | Phase 2 | Pending |
-| THEME-04 | Phase 2 | Pending |
+| COPY-01 | Phase 1 | Complete (01-01/01-02) |
+| COPY-02 | Phase 1 | Complete (01-01/01-02) |
+| COPY-03 | Phase 1 | Complete (01-01/01-02) |
+| THEME-01 | Phase 2 | Complete |
+| THEME-02 | Phase 2 | Complete |
+| THEME-03 | Phase 2 | Dropped (dark-only 2026-09-05) |
+| THEME-04 | Phase 2 | Complete |
 | SETUP-01 | Phase 3 | Pending |
 | SETUP-02 | Phase 3 | Pending |
 | SETUP-03 | Phase 3 | Pending |

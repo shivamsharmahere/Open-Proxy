@@ -2,7 +2,7 @@
 
 ## What This Is
 
-OPENPROXY is a rate-limit-aware, OpenAI-compatible multi-upstream LLM proxy (Rust + embedded dashboard) forked from nim-proxy. Operators run it in Docker, claim it via a first-run setup wizard, and point OpenAI-speaking clients at it. This milestone rebrands every screen from NIM-specific to provider-neutral copy and ships a dual-theme console.
+OPENPROXY is a rate-limit-aware, OpenAI-compatible multi-upstream LLM proxy (Rust + embedded dashboard) forked from nim-proxy. Operators run it in Docker, claim it via a first-run setup wizard, and point OpenAI-speaking clients at it. This milestone rebrands every screen from NIM-specific to provider-neutral copy and ships a graphite + violet console.
 
 ## Core Value
 
@@ -16,13 +16,13 @@ A first-time user can sign up, configure any providers, and make a successful pr
 - ✓ Global model toggles + merged `/v1/models` catalog — v0.6.6
 - ✓ Dark slate-navy console with cyan accent — v0.6.6
 - ✓ OPENPROXY binary, image, and dashboard brand rename — v0.6.6
+- ✓ Provider-neutral copy on setup wizard, login, and dashboard (COPY-01/02/03) — Phase 1 (29 en + 27 desc, fresh hashes, fixtures regen, all gates green; identifiers frozen)
 
 ### Active
 
-- [ ] Provider-neutral copy on setup wizard, login, and dashboard (no NIM-only wording)
-- [ ] Dual theme: orange-on-black dark + creamy light, toggle defaulting to OS setting
+- [ ] Violet theme: graphite surfaces + violet primary + cyan secondary + semantic status colors, dark-only (scope delta 2026-09-05, supersedes orange dual-theme; toggle + light theme dropped same day)
 - [ ] Multi-provider first setup (extra groups + keys claimable in the wizard)
-- [ ] Verified end-to-end: signup → setup → dashboard → first proxied call, both themes
+- [ ] Verified end-to-end: signup → setup → dashboard → first proxied call (dark console)
 
 ### Out of Scope
 
@@ -30,13 +30,13 @@ A first-time user can sign up, configure any providers, and make a successful pr
 - Additional locales (en-US only) — catalog system unchanged
 - Pricing/billing UI — no product requirement
 
-## Current Milestone: v1 OPENPROXY Rebrand & Dual-Theme Console
+## Current Milestone: v1 OPENPROXY Rebrand & Violet Console
 
-**Goal:** Rebrand every screen to provider-neutral OPENPROXY copy, ship the dual-theme console, and make first setup support multiple providers end to end.
+**Goal:** Rebrand every screen to provider-neutral OPENPROXY copy, ship the graphite + violet console, and make first setup support multiple providers end to end.
 
 **Target features:**
 - Copy sweep incl. wizard + dashboard + catalog hashes/fixtures
-- Dual-theme token system + toggle defaulting to OS, orange dark accent
+- Violet theme tokens (graphite/violet/cyan/semantic), vanilla CSS variables — no Tailwind (scope delta 2026-09-05)
 - Multi-provider setup wizard incl. SetupReq/API changes
 - Full signup-to-first-call verification + screenshots + rebuilt image
 
@@ -60,8 +60,9 @@ A first-time user can sign up, configure any providers, and make a successful pr
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Orange (burnt) dark accent, creamy light | User chose over green; cyan replaced to give OPENPROXY its own identity | — Pending |
-| Theme toggle in UI, remembered, OS default | User chose over OS-only; explicit control + sensible default | — Pending |
+| Orange (burnt) dark accent, creamy light | User chose over green; cyan replaced to give OPENPROXY its own identity | SUPERSEDED 2026-09-05 — user switched to violet (next row) |
+| Theme toggle in UI, remembered, OS default | User chose over OS-only; explicit control + sensible default | DROPPED 2026-09-05 — dark-only console, nothing to toggle to |
+| Graphite + violet primary + cyan secondary + semantic status colors (dark) | User switched from orange dual-theme; proposal adapted: vanilla CSS vars (no Tailwind), OPENPROXY naming, no Dollars-Saved card, data-driven (not per-model) chart colors | — Pending |
 | Full multi-provider setup (not copy-only) | Fixes the reported "only NVIDIA at setup" gap at its root | — Pending |
 | Execute via GSD milestone v1 + autonomous | User chose milestone scaffolding over direct execution | — Pending |
 

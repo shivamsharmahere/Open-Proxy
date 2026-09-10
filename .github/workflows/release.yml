@@ -76,7 +76,7 @@ jobs:
             fi
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git tag -a "v$version" -m "nim-proxy $version" "$GITHUB_SHA"
+            git tag -a "v$version" -m "open-proxy $version" "$GITHUB_SHA"
             git push origin "v$version"
           else
             # The binary reports CARGO_PKG_VERSION; the image is labeled with
@@ -160,7 +160,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
       # Extract the exact static binary we just shipped — natively on this
-      # runner: create (not run) a container and copy /nim-proxy out.
+      # runner: create (not run) a container and copy /open-proxy out.
       - name: Extract release binary
         env:
           RELEASE_ARCH: ${{ matrix.arch }}
@@ -170,13 +170,13 @@ jobs:
         run: |
           set -euo pipefail
           cid=$(docker create --platform "$RELEASE_PLATFORM" "${IMAGE}@${BUILD_DIGEST}")
-          docker cp "$cid:/nim-proxy" "nim-proxy-${RELEASE_ARCH}"
+          docker cp "$cid:/open-proxy" "open-proxy-${RELEASE_ARCH}"
           docker rm "$cid" >/dev/null
-          tar -czf "nim-proxy-${RELEASE_VERSION}-linux-${RELEASE_ARCH}.tar.gz" "nim-proxy-${RELEASE_ARCH}"
+          tar -czf "open-proxy-${RELEASE_VERSION}-linux-${RELEASE_ARCH}.tar.gz" "open-proxy-${RELEASE_ARCH}"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: binary-${{ matrix.arch }}
-          path: nim-proxy-*.tar.gz
+          path: open-proxy-*.tar.gz
           if-no-files-found: error
 
   merge:
@@ -248,11 +248,11 @@ jobs:
         with:
           image: ${{ env.IMAGE }}@${{ steps.manifest.outputs.digest }}
           format: spdx-json
-          output-file: nim-proxy-sbom.spdx.json
+          output-file: open-proxy-sbom.spdx.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sbom
-          path: nim-proxy-sbom.spdx.json
+          path: open-proxy-sbom.spdx.json
           if-no-files-found: error
 
   release:
@@ -284,7 +284,7 @@ jobs:
       - name: Sign release assets (keyless)
         run: |
           set -euo pipefail
-          for f in nim-proxy-*.tar.gz nim-proxy-sbom.spdx.json; do
+          for f in open-proxy-*.tar.gz open-proxy-sbom.spdx.json; do
             cosign sign-blob --yes \
               --bundle "$f.sigstore.json" \
               "$f"
@@ -312,8 +312,8 @@ jobs:
             printf '%s\n\n' '```'
             printf '%s\n\n' 'Verify a downloaded asset (tarball or SBOM) against its Sigstore bundle:'
             printf '%s\n' '```sh'
-            printf 'cosign verify-blob nim-proxy-%s-linux-amd64.tar.gz \\\n' "$RELEASE_VERSION"
-            printf '  --bundle nim-proxy-%s-linux-amd64.tar.gz.sigstore.json \\\n' "$RELEASE_VERSION"
+            printf 'cosign verify-blob open-proxy-%s-linux-amd64.tar.gz \\\n' "$RELEASE_VERSION"
+            printf '  --bundle open-proxy-%s-linux-amd64.tar.gz.sigstore.json \\\n' "$RELEASE_VERSION"
             printf "  --certificate-identity-regexp 'https://github.com/%s/.github/workflows/release.yml@.*' \\\\\n" "$REPOSITORY"
             printf '%s\n' '  --certificate-oidc-issuer https://token.actions.githubusercontent.com'
             printf '%s\n' '```'
@@ -322,10 +322,10 @@ jobs:
           # Explicit tag: dispatch runs start from a branch ref. --notes is a
           # preamble when combined with --generate-notes.
           gh release create "$RELEASE_TAG" \
-            nim-proxy-*.tar.gz \
-            nim-proxy-*.tar.gz.sigstore.json \
-            nim-proxy-sbom.spdx.json \
-            nim-proxy-sbom.spdx.json.sigstore.json \
+            open-proxy-*.tar.gz \
+            open-proxy-*.tar.gz.sigstore.json \
+            open-proxy-sbom.spdx.json \
+            open-proxy-sbom.spdx.json.sigstore.json \
             --repo "$REPOSITORY" \
             --generate-notes \
             --notes "$(<release-notes.md)"

@@ -139,17 +139,20 @@ fn backoff_for(resp: &reqwest::Response) -> Duration {
 
 /// Join the global FIFO queue for a rate-limit slot, invoking `on_wait` every
 /// heartbeat interval so streaming callers can keep their client alive.
-/// Returns None if the queue rejects us (no slot before the deadline) or
-/// `on_wait` reports the client is gone.
+/// `allowed` restricts the grant to endpoint groups that serve the request's
+/// model (model routing); `None` means every group. Returns None if the queue
+/// rejects us (no slot before the deadline) or `on_wait` reports the client
+/// is gone.
 async fn reserve_slot(
     state: &AppState,
     heartbeat: Duration,
     deadline: Instant,
     prefer: Option<usize>,
+    allowed: Option<Vec<usize>>,
     mut on_wait: impl FnMut() -> bool,
 ) -> Option<Slot> {
     let queued = Instant::now();
-    let mut rx = state.dispatch.acquire(deadline, prefer);
+    let mut rx = state.dispatch.acquire_filtered(deadline, prefer, allowed);
     loop {
         tokio::select! {
             slot = &mut rx => {
@@ -520,6 +523,23 @@ pub async fn handle(
         started: Instant::now(),
     };
 
+    // Model routing: which endpoint groups may serve this request. A
+    // toggled-off model is rejected before queueing (no rate budget spent);
+    // a model no enabled group carries is a 404, not a wait-until-timeout.
+    // Routing uses the raw id — the metric label may collapse to "other".
+    let allowed = match cfg.route_model(raw_model) {
+        None => {
+            record_request(&ctx, "404");
+            return model_disabled(raw_model);
+        }
+        Some(v) if v.is_empty() => {
+            record_request(&ctx, "404");
+            return model_not_found(raw_model);
+        }
+        Some(v) => v,
+    };
+    tracing::debug!(model = %ctx.model, groups = ?allowed, "routed request");
+
     // Answer the model-catalog probe from cache: harnesses poll it and it
     // shouldn't burn rate-limit budget on every poll.
     if method == Method::GET && uri.path() == "/v1/models" {
@@ -588,6 +608,7 @@ pub async fn handle(
             body,
             prefer,
             fallback,
+            allowed,
             inflight_guard,
             request_deadline,
             wait_deadline,
@@ -604,6 +625,7 @@ pub async fn handle(
             headers,
             body,
             prefer,
+            &allowed,
             wait_deadline,
         );
         if let Some(deadline) = request_deadline {
@@ -649,6 +671,7 @@ async fn buffered(
     headers: HeaderMap,
     body: Bytes,
     prefer: Option<usize>,
+    allowed: &[usize],
     deadline: Instant,
 ) -> Response {
     let _active = crate::dispatch::scopeguard(|| gauge!("nimproxy_active_requests").decrement(1.0));
@@ -656,12 +679,20 @@ async fn buffered(
     loop {
         // Two admission gates: a model-pressure permit (worker concurrency,
         // held through the whole upstream exchange — dropped on every exit
-        // from this iteration), then an RPM slot.
+        // from this iteration), then an RPM slot on a group serving the model.
         let Ok(_permit) = acquire_model_permit(&state, &cfg, &ctx, deadline, || true).await else {
             record_request(&ctx, "504");
             return gateway_timeout(&cfg, state.pool().len());
         };
-        let Some(slot) = reserve_slot(&state, cfg.heartbeat, deadline, prefer, || true).await
+        let Some(slot) = reserve_slot(
+            &state,
+            cfg.heartbeat,
+            deadline,
+            prefer,
+            Some(allowed.to_vec()),
+            || true,
+        )
+        .await
         else {
             record_request(&ctx, "504");
             return gateway_timeout(&cfg, state.pool().len());
@@ -671,7 +702,7 @@ async fn buffered(
         // can't pin an in-flight slot forever (streaming has no such cap).
         let resp = match upstream_request(
             &state.http,
-            &cfg.base_url,
+            &slot.base_url,
             &method,
             &path_query,
             &headers,
@@ -727,6 +758,7 @@ fn streaming(
     mut body: Bytes,
     prefer: Option<usize>,
     mut fallback: Option<Bytes>,
+    allowed: Vec<usize>,
     inflight_guard: impl Send + 'static,
     request_deadline: Option<RequestDeadline>,
     deadline: Instant,
@@ -773,10 +805,17 @@ fn streaming(
                         .await;
                     return;
                 };
-                let slot = reserve_slot(&state, cfg.heartbeat, deadline, prefer, || {
-                    tx.try_send(Ok(Bytes::from_static(b": heartbeat\n\n")))
-                        .is_ok()
-                })
+                let slot = reserve_slot(
+                    &state,
+                    cfg.heartbeat,
+                    deadline,
+                    prefer,
+                    Some(allowed.clone()),
+                    || {
+                        tx.try_send(Ok(Bytes::from_static(b": heartbeat\n\n")))
+                            .is_ok()
+                    },
+                )
                 .await;
                 let Some(slot) = slot else {
                     record_request(&ctx, "504");
@@ -791,7 +830,7 @@ fn streaming(
                 let sent_at = Instant::now();
                 let resp = match upstream_request(
                     &state.http,
-                    &cfg.base_url,
+                    &slot.base_url,
                     &method,
                     &path_query,
                     &headers,
@@ -972,6 +1011,11 @@ fn streaming(
 /// /v1/models, cached so harness catalog polls cost zero rate budget. The
 /// lock is held across the refresh so concurrent misses make one upstream
 /// call (followers see the fresh cache when they get the lock).
+///
+/// With several endpoint groups the catalog fans out: one rate slot per
+/// group that has a key, merged by model id (first group wins) with globally
+/// toggled-off models removed. A single group's catalog still passes through
+/// byte-identical, preserving the historical contract.
 async fn models(state: Arc<AppState>, cfg: Arc<Config>) -> Response {
     let mut cache = state.models_cache.lock().await;
     if let Some((at, body)) = cache.as_ref() {
@@ -979,30 +1023,107 @@ async fn models(state: Arc<AppState>, cfg: Arc<Config>) -> Response {
             return json_response(StatusCode::OK, body.clone());
         }
     }
-    let deadline = Instant::now() + Duration::from_secs(30);
-    let Some(slot) = reserve_slot(&state, cfg.heartbeat, deadline, None, || true).await else {
+    let live = state.pool().active_endpoints();
+    let targets: Vec<usize> = cfg
+        .endpoints
+        .iter()
+        .enumerate()
+        .filter(|(i, ep)| ep.enabled && live.contains(i))
+        .map(|(i, _)| i)
+        .collect();
+    if targets.is_empty() {
         return gateway_timeout(&cfg, state.pool().len());
-    };
-    match fetch_models(&state.http, &cfg.base_url, &slot.key).await {
-        Ok(resp) if resp.status().is_success() => {
-            let body = resp.bytes().await.unwrap_or_default();
-            *cache = Some((Instant::now(), body.clone()));
-            json_response(StatusCode::OK, body)
-        }
-        Ok(resp) => {
-            if retryable(resp.status()) {
-                enter_cooldown(&slot, resp.status().as_str(), backoff_for(&resp));
+    }
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let mut hits: Vec<Bytes> = Vec::new();
+    let mut error: Option<Response> = None;
+    for t in &targets {
+        let Some(slot) = reserve_slot(
+            &state,
+            cfg.heartbeat,
+            deadline,
+            None,
+            Some(vec![*t]),
+            || true,
+        )
+        .await
+        else {
+            continue; // this group is saturated; others may still answer
+        };
+        match fetch_models(&state.http, &slot.base_url, &slot.key).await {
+            Ok(resp) if resp.status().is_success() => {
+                hits.push(resp.bytes().await.unwrap_or_default());
             }
-            let status =
-                StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
-            let body = resp.bytes().await.unwrap_or_default();
-            json_response(status, body)
-        }
-        Err(e) => {
-            tracing::warn!(error = %e, "models fetch failed");
-            gateway_timeout(&cfg, state.pool().len())
+            Ok(resp) => {
+                if retryable(resp.status()) {
+                    enter_cooldown(&slot, resp.status().as_str(), backoff_for(&resp));
+                }
+                if error.is_none() {
+                    let status = StatusCode::from_u16(resp.status().as_u16())
+                        .unwrap_or(StatusCode::BAD_GATEWAY);
+                    let body = resp.bytes().await.unwrap_or_default();
+                    error = Some(json_response(status, body));
+                }
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, upstream = %slot.upstream, "models fetch failed");
+                if error.is_none() {
+                    error = Some(gateway_timeout(&cfg, state.pool().len()));
+                }
+            }
         }
     }
+    if hits.is_empty() {
+        return error.unwrap_or_else(|| gateway_timeout(&cfg, state.pool().len()));
+    }
+    let body = if hits.len() == 1 && cfg.disabled_models.is_empty() {
+        hits.pop().unwrap()
+    } else {
+        merge_catalogs(&hits, &cfg.disabled_models)
+    };
+    *cache = Some((Instant::now(), body.clone()));
+    json_response(StatusCode::OK, body)
+}
+
+/// Merge per-group model catalogs into one OpenAI list: entries keyed by
+/// `id` (first group wins), globally toggled-off models removed. Bodies
+/// that don't parse as a catalog are skipped; if none parse, the first
+/// body passes through so an upstream payload still surfaces verbatim.
+fn merge_catalogs(bodies: &[Bytes], disabled: &[String]) -> Bytes {
+    let mut ids = std::collections::HashSet::new();
+    let mut data = Vec::new();
+    let mut object_type = serde_json::Value::String("list".into());
+    let mut parsed = false;
+    for body in bodies {
+        let Ok(v) = serde_json::from_slice::<serde_json::Value>(body) else {
+            continue;
+        };
+        let Some(arr) = v.get("data").and_then(|d| d.as_array()) else {
+            continue;
+        };
+        parsed = true;
+        if data.is_empty() {
+            if let Some(o) = v.get("object") {
+                object_type = o.clone();
+            }
+        }
+        for entry in arr {
+            let id = entry.get("id").and_then(|i| i.as_str()).unwrap_or("");
+            if id.is_empty() || disabled.iter().any(|m| m == id) {
+                continue;
+            }
+            if ids.insert(id.to_owned()) {
+                data.push(entry.clone());
+            }
+        }
+    }
+    if !parsed {
+        return bodies.first().cloned().unwrap_or_default();
+    }
+    Bytes::from(
+        serde_json::to_vec(&serde_json::json!({ "object": object_type, "data": data }))
+            .expect("merged catalog serializes"),
+    )
 }
 
 /// The raw model-catalog fetch with an explicit key — shared by the cached
@@ -1013,7 +1134,9 @@ pub async fn fetch_models(
     base_url: &str,
     key: &str,
 ) -> reqwest::Result<reqwest::Response> {
-    http.get(format!("{base_url}/v1/models"))
+    // Strip trailing /v1 to avoid double-v1 paths when users paste provider URLs
+    let base = base_url.trim_end_matches("/v1").trim_end_matches('/');
+    http.get(format!("{base}/v1/models"))
         .bearer_auth(key)
         .send()
         .await
@@ -1097,6 +1220,26 @@ fn invalid_deadline() -> Response {
 fn deadline_exceeded() -> Response {
     let body = proxy_error_json("deadline_exceeded", "proxy request deadline exceeded");
     (StatusCode::GATEWAY_TIMEOUT, axum::Json(body)).into_response()
+}
+
+/// A model the operator toggled off: rejected before queueing so it spends
+/// no rate budget and waits for no slot.
+fn model_disabled(model: &str) -> Response {
+    let body = proxy_error_json(
+        "model_disabled",
+        format!("model {model} is disabled on this proxy"),
+    );
+    (StatusCode::NOT_FOUND, axum::Json(body)).into_response()
+}
+
+/// A model no enabled endpoint group carries (every group allowlists other
+/// models): a 404, not a wait-until-timeout.
+fn model_not_found(model: &str) -> Response {
+    let body = proxy_error_json(
+        "model_not_found",
+        format!("no enabled upstream serves model {model}"),
+    );
+    (StatusCode::NOT_FOUND, axum::Json(body)).into_response()
 }
 
 fn overloaded(max_inflight: usize) -> Response {
@@ -1215,6 +1358,55 @@ mod tests {
             &serde_json::json!({"response_format": {"type": "text"}})
         ));
         assert!(!is_json_mode(&serde_json::json!({"model": "x"})));
+    }
+
+    #[test]
+    fn merge_catalogs_dedupes_by_id_first_group_wins() {
+        use super::merge_catalogs;
+        use bytes::Bytes;
+        let a = Bytes::from(
+            r#"{"object":"list","data":[{"id":"m1","object":"model"},{"id":"shared","object":"model","owned_by":"a"}]}"#,
+        );
+        let b = Bytes::from(
+            r#"{"object":"list","data":[{"id":"shared","object":"model","owned_by":"b"},{"id":"m2","object":"model"}]}"#,
+        );
+        let merged: serde_json::Value =
+            serde_json::from_slice(&merge_catalogs(&[a, b], &[])).unwrap();
+        let ids: Vec<&str> = merged["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["id"].as_str().unwrap())
+            .collect();
+        assert_eq!(ids, vec!["m1", "shared", "m2"]);
+        assert_eq!(merged["data"][1]["owned_by"], "a");
+    }
+
+    #[test]
+    fn merge_catalogs_removes_disabled_models() {
+        use super::merge_catalogs;
+        use bytes::Bytes;
+        let a = Bytes::from(
+            r#"{"object":"list","data":[{"id":"keep","object":"model"},{"id":"off","object":"model"}]}"#,
+        );
+        let merged: serde_json::Value =
+            serde_json::from_slice(&merge_catalogs(&[a], &["off".to_owned()])).unwrap();
+        let ids: Vec<&str> = merged["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["id"].as_str().unwrap())
+            .collect();
+        assert_eq!(ids, vec!["keep"]);
+    }
+
+    #[test]
+    fn merge_catalogs_passes_through_when_nothing_parses() {
+        use super::merge_catalogs;
+        use bytes::Bytes;
+        let raw = Bytes::from("upstream exploded");
+        assert_eq!(merge_catalogs(std::slice::from_ref(&raw), &[]), raw);
+        assert!(merge_catalogs(&[], &[]).is_empty());
     }
 }
 

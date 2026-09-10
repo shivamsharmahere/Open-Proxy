@@ -24,7 +24,7 @@ struct InstalledLocale {
 const DASHBOARD: &str = include_str!("web/dashboard.html");
 const LOGIN: &str = include_str!("web/login.html");
 const SETUP: &str = include_str!("web/setup.html");
-const NIM_PROXY_ICON: &str = include_str!("web/icons/nim-proxy.svg");
+const OPEN_PROXY_ICON: &str = include_str!("web/icons/open-proxy.svg");
 const EN_US_SOURCE: &str = include_str!("web/locales/en-US.json");
 
 pub const DEFAULT_LOCALE: &str = "en-US";
@@ -189,7 +189,7 @@ static PAGES: OnceLock<Pages> = OnceLock::new();
 
 fn pages() -> &'static Pages {
     PAGES.get_or_init(|| Pages {
-        dashboard: DASHBOARD.replace("<!-- nim-proxy-icon -->", NIM_PROXY_ICON),
+        dashboard: DASHBOARD.replace("<!-- open-proxy-icon -->", OPEN_PROXY_ICON),
         login: LOGIN.replace("{{error_code}}", ""),
         login_invalid_credentials: LOGIN.replace("{{error_code}}", "invalid_credentials"),
         setup: SETUP.to_owned(),
@@ -305,7 +305,7 @@ mod tests {
         let first = page(Page::Dashboard);
         let second = page(Page::Dashboard);
         assert!(std::ptr::eq(first.as_ptr(), second.as_ptr()));
-        assert!(first.contains(NIM_PROXY_ICON));
-        assert!(!first.contains("<!-- nim-proxy-icon -->"));
+        assert!(first.contains(OPEN_PROXY_ICON));
+        assert!(!first.contains("<!-- open-proxy-icon -->"));
     }
 }

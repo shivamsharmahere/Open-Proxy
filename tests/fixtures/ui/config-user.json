@@ -6,6 +6,7 @@
       "owner": "fixture-user"
     }
   ],
+  "disabled_models": [],
   "locale": "en-US",
   "mode": "keyed",
   "nim_keys": [
@@ -18,7 +19,8 @@
       "lane": 0,
       "last4": "wxyz",
       "owner": "fixture-user",
-      "rpm": 40
+      "rpm": 40,
+      "upstream": "nvidia"
     }
   ],
   "pool": {
@@ -26,5 +28,14 @@
     "enabled": 2
   },
   "role": "user",
+  "upstreams": [
+    {
+      "base_url": "https://integrate.api.nvidia.com",
+      "enabled": true,
+      "keys": 2,
+      "models": [],
+      "name": "nvidia"
+    }
+  ],
   "username": "fixture-user"
 }

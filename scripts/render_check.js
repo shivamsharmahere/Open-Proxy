@@ -1479,7 +1479,7 @@ const DOM_CONTRACTS = {
     domContract('added-key-present', `!!document.querySelector('[data-ksfp="f17e0001"]')`, true),
     domContract('validated-model-count-retained',
       `document.querySelector('#nk-err')?.textContent.trim() ?? null`,
-      '✓ 3 models found. Adding NIM API key…'),
+      '✓ 3 models found. Adding API key…'),
   ],
   'mutation-nim-key-rpm': [
     domContract('rpm-value', `document.querySelector('[data-rpm="0"]')?.value ?? null`, '41'),
@@ -4164,8 +4164,8 @@ async function freePort() {
 }
 
 async function startProxy(tmpdir, setupRequired = IS_SETUP) {
-  const binary = path.join(ROOT, 'target', 'debug', 'nim-proxy');
-  execFileSync('cargo', ['build', '--quiet', '--bin', 'nim-proxy'], {
+  const binary = path.join(ROOT, 'target', 'debug', 'open-proxy');
+  execFileSync('cargo', ['build', '--quiet', '--bin', 'open-proxy'], {
     cwd: ROOT,
     stdio: 'inherit',
   });
@@ -6394,7 +6394,7 @@ async function main() {
       }
     } else if (emergencyExpected) {
       if (visible.hidden
-          || visible.text !== 'NIM Proxy interface failed to load.') {
+          || visible.text !== 'Open Proxy interface failed to load.') {
         const check = startupProbe === 'app-script-failure'
           ? 'app-asset-emergency-only'
           : 'emergency-only';
@@ -6580,7 +6580,7 @@ async function main() {
     const selectedLoginMessages = localeArg
       ? publicCatalogProjection(loadTestLocaleCatalog(localeArg)).messages
       : null;
-    const expectedAppName = selectedLoginMessages?.['common.app_name'] ?? 'NIM Proxy';
+    const expectedAppName = selectedLoginMessages?.['common.app_name'] ?? 'Open Proxy';
     const expectedPrompt = selectedLoginMessages?.['login.prompt'] ?? 'Sign in to the dashboard.';
     const loginFailure = await evaluate(`
       (() => {

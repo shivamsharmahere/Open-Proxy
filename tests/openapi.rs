@@ -32,7 +32,7 @@ fn spec_path() -> PathBuf {
 
 #[test]
 fn committed_spec_matches_the_code() {
-    let generated = nim_proxy::openapi_json();
+    let generated = open_proxy::openapi_json();
     let path = spec_path();
 
     if std::env::var_os("UPDATE_OPENAPI").is_some() {
@@ -58,7 +58,7 @@ fn committed_spec_matches_the_code() {
 #[test]
 fn spec_is_usable() {
     let spec: serde_json::Value =
-        serde_json::from_str(&nim_proxy::openapi_json()).expect("the spec is JSON");
+        serde_json::from_str(&open_proxy::openapi_json()).expect("the spec is JSON");
 
     assert_eq!(spec["openapi"], "3.1.0");
     assert_eq!(spec["info"]["version"], env!("CARGO_PKG_VERSION"));
@@ -69,8 +69,8 @@ fn spec_is_usable() {
         .map(|item| item.as_object().expect("path item").len())
         .sum();
     assert_eq!(
-        operation_count, 17,
-        "15 /api/* operations + the 2 setup operations"
+        operation_count, 19,
+        "17 /api/* operations + the 2 setup operations"
     );
     assert_eq!(
         paths["/api/locale-bootstrap"]["get"]["security"]
@@ -173,7 +173,7 @@ fn spec_is_usable() {
 #[test]
 fn locale_bootstrap_schema_is_typed() {
     let spec: serde_json::Value =
-        serde_json::from_str(&nim_proxy::openapi_json()).expect("the spec is JSON");
+        serde_json::from_str(&open_proxy::openapi_json()).expect("the spec is JSON");
     assert_eq!(
         spec["paths"]["/api/locale-bootstrap"]["get"]["responses"]["200"]["content"]
             ["application/json"]["schema"]["$ref"],
@@ -197,7 +197,7 @@ fn locale_bootstrap_schema_is_typed() {
 #[test]
 fn server_settings_openapi_is_one_complete_request() {
     let spec: serde_json::Value =
-        serde_json::from_str(&nim_proxy::openapi_json()).expect("the spec is JSON");
+        serde_json::from_str(&open_proxy::openapi_json()).expect("the spec is JSON");
     let operation = &spec["paths"]["/api/settings/server"]["post"];
     assert!(
         operation.is_object(),
@@ -287,7 +287,7 @@ fn nullable_string(schema: &serde_json::Value) -> bool {
 #[test]
 fn locale_server_default_openapi_is_typed() {
     let spec: serde_json::Value =
-        serde_json::from_str(&nim_proxy::openapi_json()).expect("the spec is JSON");
+        serde_json::from_str(&open_proxy::openapi_json()).expect("the spec is JSON");
     let operation = &spec["paths"]["/api/settings/locale"]["post"];
     assert!(
         operation.is_object(),
@@ -323,7 +323,7 @@ fn locale_server_default_openapi_is_typed() {
 #[test]
 fn locale_account_openapi_preserves_password_and_adds_preference_actions() {
     let spec: serde_json::Value =
-        serde_json::from_str(&nim_proxy::openapi_json()).expect("the spec is JSON");
+        serde_json::from_str(&open_proxy::openapi_json()).expect("the spec is JSON");
     let operation = &spec["paths"]["/api/settings/account"]["post"];
     let summary = operation["summary"].as_str().unwrap_or_default();
     assert!(
@@ -391,17 +391,19 @@ fn locale_account_openapi_preserves_password_and_adds_preference_actions() {
 #[test]
 fn locale_config_response_openapi_fields_are_typed_and_ascii_positioned() {
     let spec: serde_json::Value =
-        serde_json::from_str(&nim_proxy::openapi_json()).expect("the spec is JSON");
+        serde_json::from_str(&open_proxy::openapi_json()).expect("the spec is JSON");
     let config = &spec["components"]["schemas"]["ConfigResponse"];
     assert_eq!(
         config["required"],
         serde_json::json!([
             "client_keys",
+            "disabled_models",
             "locale",
             "mode",
             "nim_keys",
             "pool",
             "role",
+            "upstreams",
             "username"
         ]),
         "locale-openapi: ConfigResponse required fields stay ASCII-positioned"
@@ -431,7 +433,7 @@ fn locale_config_response_openapi_fields_are_typed_and_ascii_positioned() {
 #[should_panic(expected = "route-contract:openapi-security")]
 fn global_security_self_test_names_wrong_requirement() {
     let mut spec: serde_json::Value =
-        serde_json::from_str(&nim_proxy::openapi_json()).expect("generated OpenAPI");
+        serde_json::from_str(&open_proxy::openapi_json()).expect("generated OpenAPI");
     spec["security"] = serde_json::json!([{"wrong_scheme": []}]);
     assert_global_security(&spec);
 }

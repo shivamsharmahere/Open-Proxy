@@ -235,6 +235,7 @@ pub(crate) async fn locale_bootstrap(
 #[derive(Serialize, ToSchema)]
 pub struct ConfigResponse {
     pub client_keys: Vec<ClientKeyRow>,
+    pub disabled_models: Vec<String>,
     #[schema(required = true)]
     pub locale: Option<String>,
     pub mode: Mode,
@@ -245,6 +246,7 @@ pub struct ConfigResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub server: Option<ServerSettings>,
+    pub upstreams: Vec<UpstreamRow>,
     pub username: String,
     /// Admin-only; omitted entirely for the `user` role.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -261,8 +263,9 @@ pub struct ClientKeyRow {
     pub owner: String,
 }
 
-/// A stored NIM key plus its live lane state. `lane`, `in_window` and
-/// `cooldown_ms` are null for a disabled key (it holds no lane).
+/// A stored API key plus its live lane state. `lane`, `in_window` and
+/// `cooldown_ms` are null for a disabled key (it holds no lane). `upstream`
+/// names the endpoint group the key belongs to (`nvidia` = primary).
 #[derive(Serialize, ToSchema)]
 pub struct NimKeyRow {
     pub cooldown_ms: Option<u64>,
@@ -277,6 +280,18 @@ pub struct NimKeyRow {
     pub last4: String,
     pub owner: String,
     pub rpm: usize,
+    pub upstream: String,
+}
+
+/// One endpoint group: an OpenAI-compatible API plus the keys that serve
+/// it. `models` is the group's allowlist — empty serves any model.
+#[derive(Serialize, ToSchema)]
+pub struct UpstreamRow {
+    pub base_url: String,
+    pub enabled: bool,
+    pub keys: usize,
+    pub models: Vec<String>,
+    pub name: String,
 }
 
 /// Pool aggregate — visible to every role, since it carries no ownership.
@@ -485,8 +500,8 @@ impl Modify for SecurityAddon {
 #[derive(OpenApi)]
 #[openapi(
     info(
-        title = "nim-proxy dashboard API",
-        description = "The operator surface of nim-proxy: the settings store, user and key \
+        title = "open-proxy dashboard API",
+        description = "The operator surface of open-proxy: the settings store, user and key \
                        management, and the metrics history the dashboard renders. This document \
                        is generated from the handlers; regenerate it with \
                        `UPDATE_OPENAPI=1 cargo test --test openapi`.\n\n\
@@ -505,6 +520,8 @@ impl Modify for SecurityAddon {
         crate::settings::nim_keys,
         crate::settings::clients,
         crate::settings::upstream,
+        crate::settings::upstreams,
+        crate::settings::models_cfg,
         crate::settings::limits,
         crate::settings::server,
         crate::settings::history,
@@ -542,6 +559,7 @@ impl Modify for SecurityAddon {
         ServerSettings,
         SetupResponse,
         Tail,
+        UpstreamRow,
         UserRow,
         ValidateKeyResponse,
     )),
@@ -1256,6 +1274,7 @@ mod tests {
                 name: "fixture-client".into(),
                 owner: "fixture-user".into(),
             }],
+            disabled_models: Vec::new(),
             locale: Some("en-US".into()),
             mode: Mode::Keyed,
             nim_keys: vec![
@@ -1269,6 +1288,7 @@ mod tests {
                     last4: "wxyz".into(),
                     owner: "fixture-user".into(),
                     rpm: 40,
+                    upstream: "nvidia".into(),
                 },
                 NimKeyRow {
                     cooldown_ms: Some(0),
@@ -1280,6 +1300,7 @@ mod tests {
                     last4: "root".into(),
                     owner: "fixture-superuser".into(),
                     rpm: 40,
+                    upstream: "nvidia".into(),
                 },
             ],
             pool: PoolSummary {
@@ -1288,6 +1309,13 @@ mod tests {
             },
             role,
             server: Some(server_ui_fixture()),
+            upstreams: vec![UpstreamRow {
+                base_url: "https://integrate.api.nvidia.com".into(),
+                enabled: true,
+                keys: 2,
+                models: Vec::new(),
+                name: "nvidia".into(),
+            }],
             username: username.into(),
             users: Some({
                 let mut users = vec![UserRow {
@@ -2396,6 +2424,17 @@ mod tests {
                 last4: "wxyz".into(),
                 owner: "root".into(),
                 rpm: 40,
+                upstream: "nvidia".into(),
+            },
+        );
+        sorted(
+            "UpstreamRow",
+            &UpstreamRow {
+                base_url: "https://example.invalid".into(),
+                enabled: true,
+                keys: 1,
+                models: Vec::new(),
+                name: "nvidia".into(),
             },
         );
         sorted(
@@ -2446,6 +2485,7 @@ mod tests {
             "ConfigResponse",
             &ConfigResponse {
                 client_keys: Vec::new(),
+                disabled_models: Vec::new(),
                 locale: None,
                 mode: Mode::Keyed,
                 nim_keys: Vec::new(),
@@ -2455,6 +2495,7 @@ mod tests {
                 },
                 role: Role::Superuser,
                 server: Some(server),
+                upstreams: Vec::new(),
                 username: "root".into(),
                 users: Some(Vec::new()),
             },
@@ -2539,6 +2580,7 @@ mod tests {
     fn optional_sections_are_omitted_not_nulled() {
         let user_view = ConfigResponse {
             client_keys: Vec::new(),
+            disabled_models: Vec::new(),
             locale: None,
             mode: Mode::Open,
             nim_keys: Vec::new(),
@@ -2548,12 +2590,13 @@ mod tests {
             },
             role: Role::User,
             server: None,
+            upstreams: Vec::new(),
             username: "alice".into(),
             users: None,
         };
         assert_eq!(
             serde_json::to_string(&user_view).unwrap(),
-            r#"{"client_keys":[],"locale":null,"mode":"open","nim_keys":[],"pool":{"capacity_rpm":40,"enabled":1},"role":"user","username":"alice"}"#
+            r#"{"client_keys":[],"disabled_models":[],"locale":null,"mode":"open","nim_keys":[],"pool":{"capacity_rpm":40,"enabled":1},"role":"user","upstreams":[],"username":"alice"}"#
         );
         assert_eq!(
             serde_json::to_string(&ValidateKeyResponse::probed(Ok(3))).unwrap(),
@@ -2587,9 +2630,10 @@ mod tests {
                 last4: "wxyz".into(),
                 owner: "root".into(),
                 rpm: 40,
+                upstream: "nvidia".into(),
             })
             .unwrap(),
-            r#"{"cooldown_ms":null,"enabled":false,"fingerprint":"abcd1234","guarded":false,"in_window":null,"lane":null,"last4":"wxyz","owner":"root","rpm":40}"#
+            r#"{"cooldown_ms":null,"enabled":false,"fingerprint":"abcd1234","guarded":false,"in_window":null,"lane":null,"last4":"wxyz","owner":"root","rpm":40,"upstream":"nvidia"}"#
         );
     }
 

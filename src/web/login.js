@@ -1,6 +1,6 @@
 "use strict";
 
-const EMERGENCY_MESSAGE = "NIM Proxy interface failed to load.";
+const EMERGENCY_MESSAGE = "Open Proxy interface failed to load.";
 let MSG;
 
 function failInterface() {

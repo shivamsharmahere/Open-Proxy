@@ -33,11 +33,17 @@ pub type PoolHandle = Arc<RwLock<Arc<Pool>>>;
 const WINDOW: Duration = Duration::from_secs(61);
 
 /// A lane blueprint. Disabled specs become state carriers: held for their
-/// rate state, never granted.
+/// rate state, never granted. `endpoint` tags the lane with its group index
+/// (see `StoredConfig::endpoints`: 0 is the primary NIM group); `base_url`
+/// and `upstream` travel with the grant so the request path knows exactly
+/// which compatible API to send the request to.
 pub struct LaneSpec {
     pub key: String,
     pub rpm: usize,
     pub enabled: bool,
+    pub endpoint: usize,
+    pub base_url: String,
+    pub upstream: String,
 }
 
 struct Lane {
@@ -45,6 +51,12 @@ struct Lane {
     /// This key's requests-per-minute budget (keys can differ: paid tiers,
     /// self-hosted NIM).
     rpm: usize,
+    /// Group index into the runtime endpoint list (see [`LaneSpec`]).
+    endpoint: usize,
+    /// The compatible API this lane sends to.
+    base_url: String,
+    /// Group name for logs, metrics-free routing diagnostics, and the pool-floor rule.
+    upstream: String,
     /// Timestamps of requests sent within the last WINDOW.
     sent: Mutex<VecDeque<Instant>>,
     /// Lane is in cooldown until this instant (set after an upstream 429/5xx).
@@ -110,10 +122,16 @@ impl Pool {
                         cooldown_until: Mutex::new(*prev.cooldown_until.lock().unwrap()),
                         key: s.key,
                         rpm: s.rpm,
+                        endpoint: s.endpoint,
+                        base_url: s.base_url,
+                        upstream: s.upstream,
                     },
                     None => Lane {
                         key: s.key,
                         rpm: s.rpm,
+                        endpoint: s.endpoint,
+                        base_url: s.base_url,
+                        upstream: s.upstream,
                         sent: Mutex::new(VecDeque::new()),
                         cooldown_until: Mutex::new(now),
                     },
@@ -136,6 +154,19 @@ impl Pool {
     /// Per-lane rpm budgets, in lane order (feeds the dashboard config).
     pub fn rpms(&self) -> Vec<usize> {
         self.lanes[..self.active].iter().map(|l| l.rpm).collect()
+    }
+
+    /// Endpoint indexes holding at least one enabled lane. The catalog
+    /// fan-out consults this so it never burns a queue wait on a group
+    /// with no key to serve it.
+    pub fn active_endpoints(&self) -> Vec<usize> {
+        let mut out = Vec::new();
+        for l in &self.lanes[..self.active] {
+            if !out.contains(&l.endpoint) {
+                out.push(l.endpoint);
+            }
+        }
+        out
     }
 
     /// Point-in-time per-lane view for the Settings key rows.
@@ -162,6 +193,14 @@ impl Pool {
                 }
             })
             .collect()
+    }
+
+    /// A granted lane's endpoint metadata: `(base_url, upstream, endpoint)`.
+    /// Read from the granting pool generation so a settings-driven swap
+    /// can't reroute an in-flight reservation to another group's API.
+    pub fn lane_endpoint(&self, lane: usize) -> (String, String, usize) {
+        let l = &self.lanes[lane];
+        (l.base_url.clone(), l.upstream.clone(), l.endpoint)
     }
 
     /// Take a slot on lane `i` if it has capacity right now. Reserving
@@ -195,8 +234,22 @@ impl Pool {
     /// concurrent in-flight requests evenly across keys. An out-of-range
     /// `prefer` (computed against a pool that has since shrunk) is ignored.
     pub fn reserve(&self, prefer: Option<usize>) -> Reservation {
+        self.reserve_filtered(prefer, None)
+    }
+
+    /// [`Pool::reserve`] restricted to `allowed` endpoint groups (`None` =
+    /// every group). Model routing passes the groups that serve the
+    /// request's model, so a key is never spent on a group that doesn't
+    /// carry the model; the catalog fan-out passes a single group. Lanes
+    /// outside `allowed` are invisible: they neither grant nor set the wait.
+    pub fn reserve_filtered(
+        &self,
+        prefer: Option<usize>,
+        allowed: Option<&[usize]>,
+    ) -> Reservation {
+        let ok = |i: usize| allowed.is_none_or(|set| set.contains(&self.lanes[i].endpoint));
         let now = Instant::now();
-        if let Some(p) = prefer.filter(|&p| p < self.active) {
+        if let Some(p) = prefer.filter(|&p| p < self.active && ok(p)) {
             if let Some(r) = self.try_take(p, now, true) {
                 return r;
             }
@@ -204,7 +257,12 @@ impl Pool {
 
         let mut ready: Vec<(usize, usize)> = Vec::new(); // (in-window load, lane)
         let mut best_wait = WINDOW;
+        let mut any = false;
         for (i, lane) in self.lanes[..self.active].iter().enumerate() {
+            if !ok(i) {
+                continue;
+            }
+            any = true;
             let cooldown = *lane.cooldown_until.lock().unwrap();
             let mut sent = lane.sent.lock().unwrap();
             while sent.front().is_some_and(|t| now - *t >= WINDOW) {
@@ -231,6 +289,14 @@ impl Pool {
             if let Some(r) = self.try_take(i, now, false) {
                 return r;
             }
+        }
+        // No allowed lane exists (or all are busy): report the soonest
+        // wake-up — or the full window when the filter matches nothing, so
+        // the dispatcher fails fast at the caller's deadline instead of
+        // spinning. The proxy pre-checks this case and answers
+        // `model_not_found` without queueing, so this is unreachable there.
+        if !any {
+            return Reservation::Wait(WINDOW);
         }
         Reservation::Wait(best_wait)
     }
@@ -263,6 +329,20 @@ mod tests {
             key: key.into(),
             rpm,
             enabled,
+            endpoint: 0,
+            base_url: "https://integrate.api.nvidia.com".into(),
+            upstream: crate::config::PRIMARY_UPSTREAM.into(),
+        }
+    }
+
+    fn spec_on(key: &str, rpm: usize, endpoint: usize, upstream: &str) -> LaneSpec {
+        LaneSpec {
+            key: key.into(),
+            rpm,
+            enabled: true,
+            endpoint,
+            base_url: format!("https://upstream-{endpoint}.invalid"),
+            upstream: upstream.into(),
         }
     }
 
@@ -453,6 +533,52 @@ mod tests {
             matches!(re_enabled.reserve(None), Reservation::Wait(_)),
             "the pre-disable send must still count against the window"
         );
+    }
+
+    #[test]
+    fn reserve_filtered_stays_within_allowed_endpoints() {
+        let pool = Pool::new(vec![
+            spec_on("a", 10, 0, "nvidia"),
+            spec_on("b", 10, 1, "openai"),
+        ]);
+        // Only endpoint 1 may serve: every grant lands on lane 1.
+        for _ in 0..3 {
+            match pool.reserve_filtered(None, Some(&[1])) {
+                Reservation::Ready { lane, key, .. } => {
+                    assert_eq!(lane, 1);
+                    assert_eq!(key, "b");
+                }
+                Reservation::Wait(_) => panic!("expected Ready on endpoint 1"),
+            }
+        }
+        // An unfiltered grant still spreads across both lanes.
+        let mut lanes = std::collections::HashSet::new();
+        for _ in 0..4 {
+            lanes.insert(take(&pool, None));
+        }
+        assert!(lanes.contains(&0), "unfiltered reserve must reach lane 0");
+    }
+
+    #[test]
+    fn reserve_filtered_with_no_matching_lane_waits_out_the_window() {
+        let pool = Pool::new(vec![spec_on("a", 10, 0, "nvidia")]);
+        match pool.reserve_filtered(None, Some(&[7])) {
+            Reservation::Wait(w) => assert_eq!(w, WINDOW),
+            _ => panic!("expected Wait when no lane matches the filter"),
+        }
+    }
+
+    #[test]
+    fn prefer_on_a_disallowed_lane_falls_through_to_allowed() {
+        let pool = Pool::new(vec![
+            spec_on("a", 10, 0, "nvidia"),
+            spec_on("b", 10, 1, "openai"),
+        ]);
+        // Prefer lane 0, but only endpoint 1 is allowed: must not stick.
+        match pool.reserve_filtered(Some(0), Some(&[1])) {
+            Reservation::Ready { lane, .. } => assert_eq!(lane, 1),
+            Reservation::Wait(_) => panic!("expected Ready on lane 1"),
+        }
     }
 
     #[test]

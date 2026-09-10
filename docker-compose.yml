@@ -1,8 +1,9 @@
-# Runs the published image. To build from source instead, layer the dev file:
+# Runs the image. To build from source instead, layer the dev file:
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 services:
-  nim-proxy:
-    image: ghcr.io/miztertea/nim-proxy:latest
+  open-proxy:
+    image: open-proxy:latest
+    build: .
     restart: unless-stopped
     ports:
       # Bound to loopback by default — reachable only from this host. To expose

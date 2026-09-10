@@ -313,6 +313,13 @@ pub struct StoreOpts {
     pub clients: Vec<(String, String)>,
     /// (key, rpm) NIM keys, all enabled and owned by TEST_USER.
     pub nim_keys: Vec<(String, usize)>,
+    /// Extra endpoint groups: (name, base_url, model allowlist, keys).
+    /// Empty allowlist = the group serves any model.
+    pub extra_upstreams: Vec<ExtraUpstream>,
+    /// Model allowlist for the primary group; empty serves any model.
+    pub primary_models: Vec<String>,
+    /// Globally toggled-off models.
+    pub disabled_models: Vec<String>,
     /// Additional users (username, role: "admin" | "user"), all sharing
     /// TEST_PASSWORD.
     pub extra_users: Vec<(String, String)>,
@@ -322,6 +329,14 @@ pub struct StoreOpts {
     pub request_timeout_secs: u64,
     pub max_inflight: usize,
     pub strict_passthrough: bool,
+}
+
+/// One extra OpenAI-compatible endpoint group in a store fixture.
+pub struct ExtraUpstream {
+    pub name: String,
+    pub base_url: String,
+    pub models: Vec<String>,
+    pub keys: Vec<(String, usize)>,
 }
 
 impl Default for StoreOpts {
@@ -334,6 +349,9 @@ impl Default for StoreOpts {
                 ("test-key-1".into(), 40),
                 ("test-key-2".into(), 40),
             ],
+            extra_upstreams: Vec::new(),
+            primary_models: Vec::new(),
+            disabled_models: Vec::new(),
             extra_users: Vec::new(),
             max_wait_secs: 30,
             heartbeat_secs: 1,
@@ -362,7 +380,18 @@ impl StoreOpts {
                 "nim_keys": self.nim_keys.iter().map(|(k, rpm)| serde_json::json!({
                     "key": k, "owner": TEST_USER, "enabled": true, "rpm": rpm
                 })).collect::<Vec<_>>(),
+                "models": self.primary_models.clone(),
             },
+            "upstreams": self.extra_upstreams.iter().map(|ep| serde_json::json!({
+                "name": ep.name.clone(),
+                "base_url": ep.base_url.clone(),
+                "enabled": true,
+                "keys": ep.keys.iter().map(|(k, rpm)| serde_json::json!({
+                    "key": k, "owner": TEST_USER, "enabled": true, "rpm": rpm
+                })).collect::<Vec<_>>(),
+                "models": ep.models.clone(),
+            })).collect::<Vec<_>>(),
+            "disabled_models": self.disabled_models.clone(),
             "client_auth": {
                 "mode": if self.open { "open" } else { "keyed" },
                 "keys": self.clients.iter().map(|(name, secret)| serde_json::json!({
@@ -520,12 +549,12 @@ async fn spawn_and_wait_healthy(data_dir: std::path::PathBuf, envs: &[(&str, &st
 }
 
 fn base_cmd(port: u16, data_dir: &std::path::Path) -> std::process::Command {
-    let mut cmd = std::process::Command::new(env!("CARGO_BIN_EXE_nim-proxy"));
+    let mut cmd = std::process::Command::new(env!("CARGO_BIN_EXE_open-proxy"));
     cmd.env_clear()
         .current_dir(std::env::temp_dir()) // dodge any local .env
         .env("PORT", port.to_string())
         .env("DATA_DIR", data_dir)
-        .env("RUST_LOG", "nim_proxy=warn")
+        .env("RUST_LOG", "open_proxy=warn")
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
     // Under `cargo llvm-cov` the spawned server must write its own coverage

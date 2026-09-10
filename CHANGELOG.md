@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Console visual pass (no behavior change): visible keyboard-focus rings on
+  every control, hover/press states on all buttons, pills, nav, toggles and
+  inputs, transform-based toggle knob, dark native controls (`color-scheme`)
+  with a styled group picker, subtler card depth, table row hover, capped
+  modal height, and a reduced-motion gate. The sign-in page now uses the dark
+  console theme instead of its old light style. No strings, ids, classes, or
+  API behavior were touched.
+- Console retheme: slate-navy surfaces with a single cyan accent (was
+  warm-black with NVIDIA green), topbar divider, sticky thead separation,
+  ultra-wide content cap, cyan heatmap/lane/median hues; publisher brand
+  colors (e.g. NVIDIA green) stay untouched. Still no strings, ids, classes,
+  or behavior changes.
+
+### Changed
+
+- Renamed the product to **open-proxy**: binary, Docker image, dashboard
+  brand, and OpenAPI title. Deliberately unchanged wire: `nimproxy_*`
+  metrics, the `nimproxy_session` cookie, the `X-Nim-Proxy-Deadline-Ms`
+  header, `npk_`/`nvapi-` key prefixes, env var names, and the
+  `config.json`/history formats all stay as they were, so existing
+  dashboards, scrapers, and stores keep working. The default log filter is
+  now `open_proxy=info` (update `RUST_LOG` overrides accordingly).
+
+### Added
+
+- Multi-upstream endpoint groups: besides the primary NVIDIA NIM group, the
+  proxy now fronts any number of OpenAI-compatible APIs (other providers,
+  self-hosted NIM, second team accounts). Each group has its own base URL,
+  keys with per-key rpm, enable toggle, and model allowlist; keys stay warm
+  across disable/enable cycles via the existing state-carrier mechanism.
+- Model-name routing with toggles: a model pinned in a group's allowlist is
+  served only by that group (keys are never spent where the model doesn't
+  exist); other models fall back to catch-all groups. Globally disabled
+  models are hidden from the merged `/v1/models` catalog (one rate slot per
+  group, deduped by id) and rejected with `model_disabled` before queueing;
+  a model no enabled group carries is `404 model_not_found` instead of a
+  wait-until-timeout. New admin APIs `POST /api/settings/upstreams` and
+  `POST /api/settings/models`; `/api/config` gains `upstreams`,
+  `disabled_models`, and per-key `upstream`. Pre-multi-upstream stores load
+  unchanged as a single enabled catch-all `nvidia` group.
+
 ### Fixed
 
 - Installed locale definitions now jointly drive locale bootstrap, public and

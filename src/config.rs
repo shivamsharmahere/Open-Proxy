@@ -23,6 +23,21 @@ use utoipa::ToSchema;
 
 pub const FILE: &str = "config.json";
 
+/// The primary (legacy) upstream's endpoint name. It predates named
+/// endpoints, so its name is implicit: every pre-multi-upstream store is one
+/// group called this, and extra endpoints may not reuse it.
+pub const PRIMARY_UPSTREAM: &str = "nvidia";
+
+/// A model id is operator-typed but client-compared: accept exactly the
+/// charset the request path treats as inert (`proxy::sanitize_label` keeps
+/// these chars), bounded so a junk entry can't explode labels or the store.
+pub fn valid_model_id(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() <= 128
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '/' | ':'))
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct StoredConfig {
     #[serde(default = "default_version")]
@@ -31,6 +46,14 @@ pub struct StoredConfig {
     pub default_locale: String,
     #[serde(default)]
     pub upstream: Upstream,
+    /// Extra OpenAI-compatible endpoints beyond the primary NIM one. Empty
+    /// on stores written before multi-upstream support (backward compatible).
+    #[serde(default)]
+    pub upstreams: Vec<UpstreamEndpoint>,
+    /// Globally toggled-off models: hidden from the merged catalog and
+    /// rejected without spending rate budget.
+    #[serde(default)]
+    pub disabled_models: Vec<String>,
     #[serde(default)]
     pub client_auth: ClientAuth,
     #[serde(default)]
@@ -57,6 +80,24 @@ pub struct Upstream {
     pub base_url: String,
     #[serde(default)]
     pub nim_keys: Vec<NimKey>,
+    /// Group toggle: a disabled primary parks its lanes as state carriers
+    /// (same mechanism as a disabled key), so re-enabling resumes warm.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Model allowlist for this group; empty serves any model. Requests for
+    /// a model not listed here route to another group (or fail as unknown).
+    #[serde(default)]
+    pub models: Vec<String>,
+}
+
+impl Upstream {
+    /// Normalize base URL: strip trailing `/v1` and slashes so downstream
+    /// path-appending never produces double-v1 paths.
+    pub fn normalize_base_url(url: &str) -> String {
+        url.trim_end_matches("/v1")
+            .trim_end_matches('/')
+            .to_owned()
+    }
 }
 
 impl Default for Upstream {
@@ -64,8 +105,39 @@ impl Default for Upstream {
         Self {
             base_url: default_base_url(),
             nim_keys: Vec::new(),
+            enabled: true,
+            models: Vec::new(),
         }
     }
+}
+
+/// One extra OpenAI-compatible endpoint (a non-NVIDIA API, a self-hosted
+/// NIM, a second team account, …). Same lane semantics as the primary
+/// group: each key is a rate-limit lane, toggled independently.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct UpstreamEndpoint {
+    /// Group id (`nvidia` is reserved for the primary). Used in the API,
+    /// the dashboard, and per-request routing logs.
+    pub name: String,
+    pub base_url: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub keys: Vec<NimKey>,
+    /// Model allowlist for this group; empty serves any model.
+    #[serde(default)]
+    pub models: Vec<String>,
+}
+
+/// One endpoint group as the pool, router, and dashboard see it: the
+/// stored order flattened with the primary first. Indexes from this view
+/// are the `endpoint` tags on pool lanes.
+#[derive(Clone, Debug)]
+pub struct EndpointView {
+    pub name: String,
+    pub base_url: String,
+    pub enabled: bool,
+    pub models: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -271,24 +343,107 @@ impl StoredConfig {
         self.users.iter_mut().find(|u| u.username == username)
     }
 
-    /// Every stored key as a pool lane spec. Disabled keys ride along as
+    /// Every stored key as a pool lane spec, tagged with its endpoint.
+    /// Disabled keys — and keys on a disabled endpoint — ride along as
     /// state carriers so a disable→enable cycle can't reset their windows.
     pub fn pool_specs(&self) -> Vec<crate::pool::LaneSpec> {
-        self.upstream
-            .nim_keys
+        let mut specs = Vec::new();
+        let mut push_group =
+            |idx: usize, name: &str, base_url: &str, group_enabled: bool, keys: &[NimKey]| {
+                let base_url = base_url.trim_end_matches('/').to_owned();
+                for k in keys {
+                    specs.push(crate::pool::LaneSpec {
+                        key: k.key.clone(),
+                        rpm: k.rpm,
+                        enabled: k.enabled && group_enabled,
+                        endpoint: idx,
+                        base_url: base_url.clone(),
+                        upstream: name.to_owned(),
+                    });
+                }
+            };
+        push_group(
+            0,
+            PRIMARY_UPSTREAM,
+            &self.upstream.base_url,
+            self.upstream.enabled,
+            &self.upstream.nim_keys,
+        );
+        for (i, ep) in self.upstreams.iter().enumerate() {
+            push_group(i + 1, &ep.name, &ep.base_url, ep.enabled, &ep.keys);
+        }
+        specs
+    }
+
+    /// The ordered endpoint groups: index 0 is always the primary NIM
+    /// group, extras follow in stored order. The pool, the router, and the
+    /// dashboard all share these indexes.
+    pub fn endpoints(&self) -> Vec<EndpointView> {
+        let mut out = vec![EndpointView {
+            name: PRIMARY_UPSTREAM.to_owned(),
+            base_url: self.upstream.base_url.trim_end_matches('/').to_owned(),
+            enabled: self.upstream.enabled,
+            models: self.upstream.models.clone(),
+        }];
+        for ep in &self.upstreams {
+            out.push(EndpointView {
+                name: ep.name.clone(),
+                base_url: ep.base_url.trim_end_matches('/').to_owned(),
+                enabled: ep.enabled,
+                models: ep.models.clone(),
+            });
+        }
+        out
+    }
+
+    /// Endpoint index by group name (`nvidia` = primary). `None` = no group.
+    pub fn endpoint_index(&self, name: &str) -> Option<usize> {
+        if name == PRIMARY_UPSTREAM {
+            return Some(0);
+        }
+        self.upstreams
             .iter()
-            .map(|k| crate::pool::LaneSpec {
-                key: k.key.clone(),
-                rpm: k.rpm,
-                enabled: k.enabled,
-            })
-            .collect()
+            .position(|ep| ep.name == name)
+            .map(|i| i + 1)
+    }
+
+    /// Mutable key lists per group (`nvidia` first): the settings layer's
+    /// add/remove/set needs one search across every group.
+    pub fn key_groups_mut(&mut self) -> Vec<(String, &mut Vec<NimKey>)> {
+        let mut out = Vec::with_capacity(1 + self.upstreams.len());
+        out.push((PRIMARY_UPSTREAM.to_owned(), &mut self.upstream.nim_keys));
+        for ep in &mut self.upstreams {
+            out.push((ep.name.clone(), &mut ep.keys));
+        }
+        out
+    }
+
+    /// The key list of one group by name (`nvidia` = primary).
+    pub fn group_keys_mut(&mut self, name: &str) -> Option<&mut Vec<NimKey>> {
+        if name == PRIMARY_UPSTREAM {
+            return Some(&mut self.upstream.nim_keys);
+        }
+        self.upstreams
+            .iter_mut()
+            .find(|ep| ep.name == name)
+            .map(|ep| &mut ep.keys)
     }
 
     /// Derive the immutable runtime snapshot the request paths consume.
     pub fn runtime(&self) -> crate::Config {
         crate::Config {
             base_url: self.upstream.base_url.trim_end_matches('/').to_owned(),
+            endpoints: self
+                .endpoints()
+                .into_iter()
+                .map(|e| crate::EndpointRuntime {
+                    name: e.name,
+                    base_url: e.base_url,
+                    enabled: e.enabled,
+                    models: e.models,
+                })
+                .collect(),
+            disabled_models: self.disabled_models.clone(),
             max_wait: Duration::from_secs(self.limits.max_wait_secs),
             heartbeat: Duration::from_secs(self.limits.heartbeat_secs),
             models_ttl: Duration::from_secs(self.limits.models_ttl_secs),
@@ -342,7 +497,7 @@ pub fn load(dir: &Path) -> Result<Option<StoredConfig>, String> {
     })?;
     if sc.version > 1 {
         return Err(format!(
-            "{} has version {} but this build understands version 1; upgrade nim-proxy",
+            "{} has version {} but this build understands version 1; upgrade open-proxy",
             path.display(),
             sc.version
         ));
@@ -447,6 +602,32 @@ pub fn validate(sc: &StoredConfig) -> Result<(), String> {
         return Err("slo_target_percent must be a number greater than 0 and at most 100".into());
     }
     check_base_url(&sc.upstream.base_url)?;
+    validate_models_list("upstream models", &sc.upstream.models)?;
+
+    // Extra endpoint groups: unique names (`nvidia` is the primary),
+    // reachable-looking URLs, well-formed allowlists.
+    let mut names = std::collections::HashSet::new();
+    names.insert(PRIMARY_UPSTREAM);
+    for ep in &sc.upstreams {
+        if !label_ok(&ep.name, 64) {
+            return Err(format!(
+                "upstream name {:?} must be 1-64 chars of letters, digits, '.', '_' or '-'",
+                ep.name
+            ));
+        }
+        if ep.name == PRIMARY_UPSTREAM {
+            return Err(format!(
+                "upstream name {PRIMARY_UPSTREAM:?} is reserved for the primary group"
+            ));
+        }
+        if !names.insert(ep.name.as_str()) {
+            return Err(format!("duplicate upstream name {:?}", ep.name));
+        }
+        check_base_url(&ep.base_url)?;
+        validate_models_list(&format!("upstream {:?} models", ep.name), &ep.models)?;
+    }
+
+    validate_disabled_models(&sc.disabled_models)?;
 
     let mut names = std::collections::HashSet::new();
     for u in &sc.users {
@@ -477,15 +658,24 @@ pub fn validate(sc: &StoredConfig) -> Result<(), String> {
     }
 
     let mut keys = std::collections::HashSet::new();
-    for k in &sc.upstream.nim_keys {
-        if k.key.trim().is_empty() {
-            return Err("a NIM key is empty".into());
+    let mut check_key = |group: &str, key: &NimKey| -> Result<(), String> {
+        if key.key.trim().is_empty() {
+            return Err(format!("a NIM key in group {group:?} is empty"));
         }
-        if !keys.insert(k.key.as_str()) {
+        if !keys.insert(key.key.clone()) {
             return Err("duplicate NIM key".into());
         }
-        if !(1..=10_000).contains(&k.rpm) {
-            return Err(format!("NIM key rpm {} out of range 1-10000", k.rpm));
+        if !(1..=10_000).contains(&key.rpm) {
+            return Err(format!("NIM key rpm {} out of range 1-10000", key.rpm));
+        }
+        Ok(())
+    };
+    for k in &sc.upstream.nim_keys {
+        check_key(PRIMARY_UPSTREAM, k)?;
+    }
+    for ep in &sc.upstreams {
+        for k in &ep.keys {
+            check_key(&ep.name, k)?;
         }
     }
 
@@ -520,9 +710,28 @@ pub fn validate(sc: &StoredConfig) -> Result<(), String> {
     // (has a superuser). A recovery store — users hand-emptied on the volume
     // — legitimately holds orphan-owned keys until the wizard reassigns them.
     if let Some(su) = sc.superuser() {
+        let mut floor = sc.upstream.enabled
+            && sc
+                .upstream
+                .nim_keys
+                .iter()
+                .any(|k| k.enabled && k.owner == su.username);
         for k in &sc.upstream.nim_keys {
             if sc.user(&k.owner).is_none() {
                 return Err(format!("NIM key owner {:?} is not a user", k.owner));
+            }
+        }
+        for ep in &sc.upstreams {
+            for k in &ep.keys {
+                if sc.user(&k.owner).is_none() {
+                    return Err(format!(
+                        "NIM key in group {:?} owner {:?} is not a user",
+                        ep.name, k.owner
+                    ));
+                }
+            }
+            if ep.enabled && ep.keys.iter().any(|k| k.enabled && k.owner == su.username) {
+                floor = true;
             }
         }
         for c in &sc.client_auth.keys {
@@ -533,18 +742,42 @@ pub fn validate(sc: &StoredConfig) -> Result<(), String> {
                 ));
             }
         }
-        if !sc
-            .upstream
-            .nim_keys
-            .iter()
-            .any(|k| k.enabled && k.owner == su.username)
-        {
+        if !floor {
             return Err(
-                "the superuser must own at least one enabled NIM key (the pool floor)".into(),
+                "the superuser must own at least one enabled NIM key on an enabled upstream (the pool floor)"
+                    .into(),
             );
         }
     }
     Ok(())
+}
+
+/// A per-group model allowlist: every entry must be a plausible model id
+/// (the request path compares these verbatim against the `model` field),
+/// with no duplicates. Empty means "serves any model".
+fn validate_models_list(label: &str, models: &[String]) -> Result<(), String> {
+    let mut seen = std::collections::HashSet::new();
+    for m in models {
+        if !valid_model_id(m) {
+            return Err(format!(
+                "{label} entry {m:?} must be 1-128 chars of letters, digits, '.', '_', '-', '/' or ':'"
+            ));
+        }
+        if !seen.insert(m.as_str()) {
+            return Err(format!("{label} has a duplicate entry {m:?}"));
+        }
+    }
+    Ok(())
+}
+
+/// The global model kill-switch list: same shape rules as allowlists, plus
+/// a cardinality cap mirroring the metric-label bound so the list itself
+/// can't become the cardinality explosion it guards against.
+fn validate_disabled_models(models: &[String]) -> Result<(), String> {
+    if models.len() > 256 {
+        return Err("disabled_models holds at most 256 entries".into());
+    }
+    validate_models_list("disabled_models", models)
 }
 
 fn validate_stored_locale(label: &str, locale: &str) -> Result<(), String> {
@@ -599,6 +832,7 @@ mod tests {
                     enabled: true,
                     rpm: 40,
                 }],
+                ..Default::default()
             },
             ..Default::default()
         }
@@ -1092,6 +1326,136 @@ mod tests {
         validate(&sc).expect("well-formed client key");
         sc.client_auth.keys[0].secret_sha256 = "nothex".into();
         assert!(validate(&sc).is_err());
+    }
+
+    fn extra(name: &str) -> UpstreamEndpoint {
+        UpstreamEndpoint {
+            name: name.into(),
+            base_url: "https://extra.invalid".into(),
+            enabled: true,
+            keys: vec![NimKey {
+                key: format!("key-{name}"),
+                owner: "root".into(),
+                enabled: true,
+                rpm: 40,
+            }],
+            models: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn extra_upstreams_validate_names_urls_and_models() {
+        let mut sc = claimed();
+        sc.upstreams.push(extra("openai"));
+        validate(&sc).expect("a well-formed extra group");
+
+        // The primary's name is reserved for the primary.
+        let mut bad = claimed();
+        let mut ep = extra("nvidia");
+        ep.keys[0].key = "other-key".into();
+        bad.upstreams.push(ep);
+        assert!(validate(&bad).is_err(), "reserved name rejected");
+
+        // Non-http(s) URLs are refused, like the primary's.
+        let mut bad = claimed();
+        let mut ep = extra("bad");
+        ep.base_url = "ftp://x".into();
+        bad.upstreams.push(ep);
+        assert!(validate(&bad).is_err(), "bad url rejected");
+
+        // Model entries use the model-id charset, with no duplicates.
+        for models in [
+            vec!["has space".to_owned()],
+            vec!["m".to_owned(), "m".to_owned()],
+        ] {
+            let mut bad = claimed();
+            let mut ep = extra("bad");
+            ep.models = models;
+            bad.upstreams.push(ep);
+            assert!(validate(&bad).is_err(), "bad allowlist rejected");
+        }
+
+        // Duplicate group names are rejected.
+        let mut dup = claimed();
+        dup.upstreams.push(extra("openai"));
+        dup.upstreams.push(extra("openai"));
+        assert!(validate(&dup).is_err(), "duplicate names rejected");
+    }
+
+    #[test]
+    fn nim_keys_are_unique_across_groups() {
+        let mut sc = claimed();
+        let mut ep = extra("openai");
+        ep.keys[0].key = "nvapi-one".into(); // collides with the primary key
+        sc.upstreams.push(ep);
+        assert_eq!(validate(&sc).unwrap_err(), "duplicate NIM key");
+    }
+
+    #[test]
+    fn disabled_models_validate_shape_and_cap() {
+        let mut sc = claimed();
+        sc.disabled_models = vec!["org/model-1".into()];
+        validate(&sc).expect("a well-formed disabled list");
+        sc.disabled_models.push("org/model-1".into());
+        assert!(validate(&sc).is_err(), "duplicate disabled model rejected");
+        sc.disabled_models = vec!["has space".into()];
+        assert!(validate(&sc).is_err(), "bad disabled model rejected");
+        sc.disabled_models = (0..257).map(|i| format!("m/{i}")).collect();
+        assert!(validate(&sc).is_err(), "disabled list is capped");
+    }
+
+    #[test]
+    fn valid_model_id_matches_the_request_path_charset() {
+        assert!(valid_model_id("meta/llama-3.3-70b"));
+        assert!(valid_model_id("org/gpt-4:free"));
+        assert!(!valid_model_id(""));
+        assert!(!valid_model_id("has space"));
+        assert!(!valid_model_id(&"a".repeat(129)));
+    }
+
+    #[test]
+    fn pool_specs_tag_lanes_with_their_group() {
+        let mut sc = claimed();
+        sc.upstreams.push(extra("openai"));
+        let specs = sc.pool_specs();
+        assert_eq!(specs.len(), 2);
+        assert_eq!(specs[0].endpoint, 0);
+        assert_eq!(specs[0].upstream, PRIMARY_UPSTREAM);
+        assert_eq!(specs[1].endpoint, 1);
+        assert_eq!(specs[1].upstream, "openai");
+        assert_eq!(specs[1].base_url, "https://extra.invalid");
+        // A disabled group parks its lanes as carriers (never granted).
+        sc.upstreams[0].enabled = false;
+        let specs = sc.pool_specs();
+        assert!(specs[0].enabled, "primary lane stays enabled");
+        assert!(!specs[1].enabled, "disabled-group lane parks as carrier");
+    }
+
+    #[test]
+    fn pool_floor_counts_enabled_keys_on_enabled_groups() {
+        let mut sc = claimed();
+        // Disabling the primary group drops the floor unless another
+        // enabled group carries a superuser key.
+        sc.upstream.enabled = false;
+        assert!(validate(&sc).is_err(), "floor lost with primary disabled");
+        sc.upstreams.push(extra("openai"));
+        validate(&sc).expect("extra group restores the floor");
+    }
+
+    #[test]
+    fn legacy_stores_default_to_a_single_enabled_group() {
+        // Stores written before multi-upstream support carry no new fields:
+        // they load as one enabled catch-all group with no disabled models.
+        let sc: StoredConfig = serde_json::from_str("{}").unwrap();
+        assert!(sc.upstreams.is_empty());
+        assert!(sc.disabled_models.is_empty());
+        assert!(sc.upstream.enabled);
+        assert!(sc.upstream.models.is_empty());
+        assert_eq!(sc.pool_specs().len(), 0);
+        let rt = sc.runtime();
+        assert_eq!(rt.endpoints.len(), 1);
+        assert_eq!(rt.endpoints[0].name, PRIMARY_UPSTREAM);
+        assert!(rt.disabled_models.is_empty());
     }
 
     #[test]

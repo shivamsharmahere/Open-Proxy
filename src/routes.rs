@@ -29,6 +29,8 @@ pub const API_CONFIG: &str = "/config";
 pub const API_SETTINGS_NIM_KEYS: &str = "/settings/nim-keys";
 pub const API_SETTINGS_CLIENTS: &str = "/settings/clients";
 pub const API_SETTINGS_UPSTREAM: &str = "/settings/upstream";
+pub const API_SETTINGS_UPSTREAMS: &str = "/settings/upstreams";
+pub const API_SETTINGS_MODELS: &str = "/settings/models";
 pub const API_SETTINGS_LIMITS: &str = "/settings/limits";
 pub const API_SETTINGS_SERVER: &str = "/settings/server";
 pub const API_SETTINGS_HISTORY: &str = "/settings/history";
@@ -285,6 +287,22 @@ const ROUTES: &[RouteContract] = &[
         probe_path: "/api/settings/upstream",
     },
     RouteContract {
+        access: Access::OperatorAdmin,
+        method: "POST",
+        openapi: true,
+        path: "/api/settings/upstreams",
+        phase: Phase::PostSetup,
+        probe_path: "/api/settings/upstreams",
+    },
+    RouteContract {
+        access: Access::OperatorAdmin,
+        method: "POST",
+        openapi: true,
+        path: "/api/settings/models",
+        phase: Phase::PostSetup,
+        probe_path: "/api/settings/models",
+    },
+    RouteContract {
         access: Access::OperatorAny,
         method: "POST",
         openapi: true,
@@ -371,7 +389,7 @@ mod tests {
     use super::*;
     use std::collections::HashSet;
 
-    const REGISTERED_API_PATHS: [&str; 15] = [
+    const REGISTERED_API_PATHS: [&str; 17] = [
         API_LOCALE_BOOTSTRAP,
         API_DASHBOARD,
         API_DASHBOARD_NOW,
@@ -379,6 +397,8 @@ mod tests {
         API_SETTINGS_NIM_KEYS,
         API_SETTINGS_CLIENTS,
         API_SETTINGS_UPSTREAM,
+        API_SETTINGS_UPSTREAMS,
+        API_SETTINGS_MODELS,
         API_SETTINGS_LIMITS,
         API_SETTINGS_SERVER,
         API_SETTINGS_HISTORY,
@@ -392,7 +412,7 @@ mod tests {
     fn assert_registered_api_paths(registered_api_paths: &[&str]) {
         assert_eq!(
             registered_api_paths.len(),
-            15,
+            17,
             "route-contract:registration: every nested /api registration must be reconciled"
         );
         for registered_path in registered_api_paths {
@@ -420,7 +440,7 @@ mod tests {
             serde_json::from_str(&crate::api::openapi_json()).expect("generated OpenAPI JSON");
         let paths = spec["paths"].as_object().expect("OpenAPI paths");
 
-        assert_eq!(ROUTES.len(), 36, "route-contract:inventory");
+        assert_eq!(ROUTES.len(), 38, "route-contract:inventory");
         assert_eq!(
             ROUTES
                 .iter()
@@ -467,7 +487,7 @@ mod tests {
                 .iter()
                 .filter(|route| route.phase == Phase::PostSetup)
                 .count(),
-            23,
+            25,
             "route-contract:phase: operator, operator assets, and client routes"
         );
         assert!(

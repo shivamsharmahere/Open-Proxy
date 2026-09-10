@@ -1,7 +1,7 @@
 # Fuzz harnesses for the untrusted-byte parsers (cargo-fuzz / libFuzzer).
 # Not part of the parent workspace: needs nightly and never ships.
 [package]
-name = "nim-proxy-fuzz"
+name = "open-proxy-fuzz"
 version = "0.0.0"
 publish = false
 edition = "2021"
@@ -11,7 +11,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-nim-proxy = { path = ".." }
+open-proxy = { path = ".." }
 
 [[bin]]
 name = "sse_scan"
