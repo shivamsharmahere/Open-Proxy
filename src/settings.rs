@@ -1070,7 +1070,7 @@ pub async fn upstreams(
             (Some(add), None, None) => {
                 cand.upstreams.push(config::UpstreamEndpoint {
                     name: add.name.trim().to_owned(),
-                    base_url: add.base_url.trim().trim_end_matches('/').to_owned(),
+                    base_url: config::Upstream::normalize_base_url(add.base_url.trim()),
                     enabled: true,
                     keys: Vec::new(),
                     models: add.models.unwrap_or_default(),
@@ -1104,7 +1104,7 @@ pub async fn upstreams(
                         ep.enabled = e;
                     }
                     if let Some(b) = set.base_url {
-                        ep.base_url = b.trim().trim_end_matches('/').to_owned();
+                        ep.base_url = config::Upstream::normalize_base_url(b.trim());
                     }
                     if let Some(m) = set.models {
                         ep.models = m;
