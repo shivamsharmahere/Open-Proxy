@@ -76,7 +76,8 @@
       "enabled": true,
       "keys": 2,
       "models": [],
-      "name": "nvidia"
+      "name": "nvidia",
+      "supports_stream_options": true
     }
   ],
   "username": "fixture-superuser",

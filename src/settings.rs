@@ -106,6 +106,10 @@ pub struct SetupGroup {
     base_url: String,
     #[serde(default)]
     keys: Vec<SetupKey>,
+    /// Whether this provider supports `stream_options.include_usage`.
+    /// Defaults to true. Set false for OpenRouter, Z.ai, etc.
+    #[serde(default = "config::default_true")]
+    supports_stream_options: bool,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -285,6 +289,7 @@ pub async fn setup_submit(State(state): State<Arc<AppState>>, req: Request) -> R
                         })
                         .collect(),
                     models: Vec::new(),
+                    supports_stream_options: group.supports_stream_options,
                 });
             }
         } else {
@@ -668,6 +673,7 @@ fn upstream_rows(sc: &StoredConfig, username: &str, admin_view: bool) -> Vec<Ups
                 enabled: bool,
                 models: &[String],
                 keys: &[NimKey],
+                supports_stream_options: bool,
                 rows: &mut Vec<UpstreamRow>| {
         let mine = keys.iter().filter(|k| k.owner == username).count();
         if admin_view || mine > 0 {
@@ -677,6 +683,7 @@ fn upstream_rows(sc: &StoredConfig, username: &str, admin_view: bool) -> Vec<Ups
                 keys: if admin_view { keys.len() } else { mine },
                 models: models.to_owned(),
                 name: name.to_owned(),
+                supports_stream_options,
             });
         }
     };
@@ -686,6 +693,7 @@ fn upstream_rows(sc: &StoredConfig, username: &str, admin_view: bool) -> Vec<Ups
         sc.upstream.enabled,
         &sc.upstream.models,
         &sc.upstream.nim_keys,
+        sc.upstream.supports_stream_options,
         &mut rows,
     );
     for ep in &sc.upstreams {
@@ -695,6 +703,7 @@ fn upstream_rows(sc: &StoredConfig, username: &str, admin_view: bool) -> Vec<Ups
             ep.enabled,
             &ep.models,
             &ep.keys,
+            ep.supports_stream_options,
             &mut rows,
         );
     }
@@ -1022,6 +1031,10 @@ pub struct AddUpstream {
     base_url: String,
     /// Model allowlist; omitted or empty serves any model.
     models: Option<Vec<String>>,
+    /// Whether this provider supports `stream_options.include_usage`.
+    /// Defaults to true (NIM/OpenAI do). Set false for OpenRouter, Z.ai, etc.
+    #[serde(default = "config::default_true")]
+    supports_stream_options: bool,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -1031,6 +1044,8 @@ pub struct SetUpstream {
     base_url: Option<String>,
     /// Full replacement of the group's model allowlist (empty = any model).
     models: Option<Vec<String>>,
+    /// Toggle whether this provider supports `stream_options.include_usage`.
+    supports_stream_options: Option<bool>,
 }
 
 /// `POST /api/settings/upstreams` (admin) — manage the extra
@@ -1074,6 +1089,7 @@ pub async fn upstreams(
                     enabled: true,
                     keys: Vec::new(),
                     models: add.models.unwrap_or_default(),
+                    supports_stream_options: add.supports_stream_options,
                 });
             }
             (None, Some(name), None) => {
@@ -1096,6 +1112,9 @@ pub async fn upstreams(
                     if let Some(m) = set.models {
                         cand.upstream.models = m;
                     }
+                    if let Some(s) = set.supports_stream_options {
+                        cand.upstream.supports_stream_options = s;
+                    }
                 } else {
                     let Some(ep) = cand.upstreams.iter_mut().find(|ep| ep.name == set.name) else {
                         return bad_request(format!("no such upstream {:?}", set.name));
@@ -1108,6 +1127,9 @@ pub async fn upstreams(
                     }
                     if let Some(m) = set.models {
                         ep.models = m;
+                    }
+                    if let Some(s) = set.supports_stream_options {
+                        ep.supports_stream_options = s;
                     }
                 }
             }

@@ -292,6 +292,7 @@ pub struct UpstreamRow {
     pub keys: usize,
     pub models: Vec<String>,
     pub name: String,
+    pub supports_stream_options: bool,
 }
 
 /// Pool aggregate — visible to every role, since it carries no ownership.
@@ -1315,6 +1316,7 @@ mod tests {
                 keys: 2,
                 models: Vec::new(),
                 name: "nvidia".into(),
+                supports_stream_options: true,
             }],
             username: username.into(),
             users: Some({
@@ -2435,6 +2437,7 @@ mod tests {
                 keys: 1,
                 models: Vec::new(),
                 name: "nvidia".into(),
+                supports_stream_options: true,
             },
         );
         sorted(

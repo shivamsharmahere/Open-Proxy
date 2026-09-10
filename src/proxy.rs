@@ -577,6 +577,8 @@ pub async fn handle(
     // Usage injection: streamed responses only report exact token usage when
     // asked via stream_options, so ask on the client's behalf. `fallback`
     // keeps the untouched body for a one-shot retry if the model rejects it.
+    // Per-endpoint: only inject when the provider supports it (NIM/OpenAI do;
+    // OpenRouter, Z.ai, etc. do not).
     let mut body = body;
     let mut fallback = None;
     if wants_stream && !cfg.strict_passthrough && uri.path() == "/v1/chat/completions" {
@@ -829,6 +831,11 @@ fn streaming(
                 };
 
                 let sent_at = Instant::now();
+                // If the granted lane's provider doesn't support
+                // stream_options, use the unmodified body.
+                if !slot.supports_stream_options && fallback.is_some() {
+                    body = fallback.take().unwrap();
+                }
                 let resp = match upstream_request(
                     &state.http,
                     &slot.base_url,

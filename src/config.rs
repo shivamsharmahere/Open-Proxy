@@ -88,6 +88,10 @@ pub struct Upstream {
     /// a model not listed here route to another group (or fail as unknown).
     #[serde(default)]
     pub models: Vec<String>,
+    /// Whether this provider supports `stream_options.include_usage`.
+    /// NIM and OpenAI do; many other OpenAI-compatible providers do not.
+    #[serde(default = "default_true")]
+    pub supports_stream_options: bool,
 }
 
 impl Upstream {
@@ -107,6 +111,7 @@ impl Default for Upstream {
             nim_keys: Vec::new(),
             enabled: true,
             models: Vec::new(),
+            supports_stream_options: true,
         }
     }
 }
@@ -127,6 +132,10 @@ pub struct UpstreamEndpoint {
     /// Model allowlist for this group; empty serves any model.
     #[serde(default)]
     pub models: Vec<String>,
+    /// Whether this provider supports `stream_options.include_usage`.
+    /// NIM and OpenAI do; many other OpenAI-compatible providers do not.
+    #[serde(default = "default_true")]
+    pub supports_stream_options: bool,
 }
 
 /// One endpoint group as the pool, router, and dashboard see it: the
@@ -138,6 +147,7 @@ pub struct EndpointView {
     pub base_url: String,
     pub enabled: bool,
     pub models: Vec<String>,
+    pub supports_stream_options: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -293,7 +303,7 @@ fn default_version() -> u32 {
 fn default_locale() -> String {
     crate::presentation::DEFAULT_LOCALE.to_owned()
 }
-fn default_true() -> bool {
+pub(crate) fn default_true() -> bool {
     true
 }
 fn default_rpm() -> usize {
@@ -349,7 +359,7 @@ impl StoredConfig {
     pub fn pool_specs(&self) -> Vec<crate::pool::LaneSpec> {
         let mut specs = Vec::new();
         let mut push_group =
-            |idx: usize, name: &str, base_url: &str, group_enabled: bool, keys: &[NimKey]| {
+            |idx: usize, name: &str, base_url: &str, group_enabled: bool, keys: &[NimKey], supports_stream_options: bool| {
                 let base_url = base_url.trim_end_matches('/').to_owned();
                 for k in keys {
                     specs.push(crate::pool::LaneSpec {
@@ -359,6 +369,7 @@ impl StoredConfig {
                         endpoint: idx,
                         base_url: base_url.clone(),
                         upstream: name.to_owned(),
+                        supports_stream_options,
                     });
                 }
             };
@@ -368,9 +379,10 @@ impl StoredConfig {
             &self.upstream.base_url,
             self.upstream.enabled,
             &self.upstream.nim_keys,
+            self.upstream.supports_stream_options,
         );
         for (i, ep) in self.upstreams.iter().enumerate() {
-            push_group(i + 1, &ep.name, &ep.base_url, ep.enabled, &ep.keys);
+            push_group(i + 1, &ep.name, &ep.base_url, ep.enabled, &ep.keys, ep.supports_stream_options);
         }
         specs
     }
@@ -384,6 +396,7 @@ impl StoredConfig {
             base_url: self.upstream.base_url.trim_end_matches('/').to_owned(),
             enabled: self.upstream.enabled,
             models: self.upstream.models.clone(),
+            supports_stream_options: self.upstream.supports_stream_options,
         }];
         for ep in &self.upstreams {
             out.push(EndpointView {
@@ -391,6 +404,7 @@ impl StoredConfig {
                 base_url: ep.base_url.trim_end_matches('/').to_owned(),
                 enabled: ep.enabled,
                 models: ep.models.clone(),
+                supports_stream_options: ep.supports_stream_options,
             });
         }
         out
@@ -1340,6 +1354,7 @@ mod tests {
                 rpm: 40,
             }],
             models: Vec::new(),
+            supports_stream_options: true,
         }
     }
 

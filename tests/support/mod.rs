@@ -381,6 +381,7 @@ impl StoreOpts {
                     "key": k, "owner": TEST_USER, "enabled": true, "rpm": rpm
                 })).collect::<Vec<_>>(),
                 "models": self.primary_models.clone(),
+                "supports_stream_options": true,
             },
             "upstreams": self.extra_upstreams.iter().map(|ep| serde_json::json!({
                 "name": ep.name.clone(),
@@ -390,6 +391,7 @@ impl StoreOpts {
                     "key": k, "owner": TEST_USER, "enabled": true, "rpm": rpm
                 })).collect::<Vec<_>>(),
                 "models": ep.models.clone(),
+                "supports_stream_options": true,
             })).collect::<Vec<_>>(),
             "disabled_models": self.disabled_models.clone(),
             "client_auth": {

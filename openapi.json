@@ -1253,6 +1253,10 @@
           "name": {
             "type": "string",
             "description": "Group id (`nvidia` is reserved for the primary group)."
+          },
+          "supports_stream_options": {
+            "type": "boolean",
+            "description": "Whether this provider supports `stream_options.include_usage`.\nDefaults to true (NIM/OpenAI do). Set false for OpenRouter, Z.ai, etc."
           }
         }
       },
@@ -2385,6 +2389,13 @@
           },
           "name": {
             "type": "string"
+          },
+          "supports_stream_options": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Toggle whether this provider supports `stream_options.include_usage`."
           }
         }
       },
@@ -2406,6 +2417,10 @@
           },
           "name": {
             "type": "string"
+          },
+          "supports_stream_options": {
+            "type": "boolean",
+            "description": "Whether this provider supports `stream_options.include_usage`.\nDefaults to true. Set false for OpenRouter, Z.ai, etc."
           }
         }
       },
@@ -2542,7 +2557,8 @@
           "enabled",
           "keys",
           "models",
-          "name"
+          "name",
+          "supports_stream_options"
         ],
         "properties": {
           "base_url": {
@@ -2563,6 +2579,9 @@
           },
           "name": {
             "type": "string"
+          },
+          "supports_stream_options": {
+            "type": "boolean"
           }
         }
       },

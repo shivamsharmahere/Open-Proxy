@@ -44,6 +44,7 @@ pub struct LaneSpec {
     pub endpoint: usize,
     pub base_url: String,
     pub upstream: String,
+    pub supports_stream_options: bool,
 }
 
 struct Lane {
@@ -57,6 +58,8 @@ struct Lane {
     base_url: String,
     /// Group name for logs, metrics-free routing diagnostics, and the pool-floor rule.
     upstream: String,
+    /// Whether this lane's provider supports `stream_options.include_usage`.
+    supports_stream_options: bool,
     /// Timestamps of requests sent within the last WINDOW.
     sent: Mutex<VecDeque<Instant>>,
     /// Lane is in cooldown until this instant (set after an upstream 429/5xx).
@@ -125,6 +128,7 @@ impl Pool {
                         endpoint: s.endpoint,
                         base_url: s.base_url,
                         upstream: s.upstream,
+                        supports_stream_options: s.supports_stream_options,
                     },
                     None => Lane {
                         key: s.key,
@@ -132,6 +136,7 @@ impl Pool {
                         endpoint: s.endpoint,
                         base_url: s.base_url,
                         upstream: s.upstream,
+                        supports_stream_options: s.supports_stream_options,
                         sent: Mutex::new(VecDeque::new()),
                         cooldown_until: Mutex::new(now),
                     },
@@ -195,12 +200,12 @@ impl Pool {
             .collect()
     }
 
-    /// A granted lane's endpoint metadata: `(base_url, upstream, endpoint)`.
+    /// A granted lane's endpoint metadata: `(base_url, upstream, endpoint, supports_stream_options)`.
     /// Read from the granting pool generation so a settings-driven swap
     /// can't reroute an in-flight reservation to another group's API.
-    pub fn lane_endpoint(&self, lane: usize) -> (String, String, usize) {
+    pub fn lane_endpoint(&self, lane: usize) -> (String, String, usize, bool) {
         let l = &self.lanes[lane];
-        (l.base_url.clone(), l.upstream.clone(), l.endpoint)
+        (l.base_url.clone(), l.upstream.clone(), l.endpoint, l.supports_stream_options)
     }
 
     /// Take a slot on lane `i` if it has capacity right now. Reserving
@@ -332,6 +337,7 @@ mod tests {
             endpoint: 0,
             base_url: "https://integrate.api.nvidia.com".into(),
             upstream: crate::config::PRIMARY_UPSTREAM.into(),
+            supports_stream_options: true,
         }
     }
 
@@ -343,6 +349,7 @@ mod tests {
             endpoint,
             base_url: format!("https://upstream-{endpoint}.invalid"),
             upstream: upstream.into(),
+            supports_stream_options: true,
         }
     }
 
