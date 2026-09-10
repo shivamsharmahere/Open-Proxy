@@ -187,3 +187,21 @@ Verification:
 
 Stage Summary:
 - DONE. Every GitHub entry point (nav icon, hero button, docs header, final CTA, footer link column) now targets github.com/shivamsharmahere/Open-Proxy.
+
+---
+Task ID: 8
+Agent: main (Super Z)
+Task: "make it star on github with logo instead of view on github"
+
+Work Log:
+- New shared client component src/components/landing/github-stars.tsx: StarCount — fetches stargazers_count from api.github.com/repos/shivamsharmahere/Open-Proxy in the visitor's browser, renders a small amber-star count chip; silently hidden when API unreachable, non-200, or 0 stars (SSR-safe: null until fetch resolves)
+- hero.tsx + final.tsx: "View on GitHub" -> "Star on GitHub" (GitHub logo kept), each with <StarCount /> chip (dark variant on the dark final CTA)
+- Nav icon-only GitHub button and docs header "GitHub" button intentionally unchanged
+
+Verification:
+- bun run lint: clean; / and /docs both 200
+- Browser: hero + final CTA show "Star on GitHub" with logo (chip hidden in sandbox — api.github.com unreachable from headless env; graceful-hide path verified, will render in real browsers once repo has stars)
+- Screenshot kept: download/verify-star-button.png; console clean
+
+Stage Summary:
+- DONE. Both GitHub CTAs now say "Star on GitHub" with the GitHub logo + live star-count chip (graceful fallback). Files: github-stars.tsx (new), hero.tsx, final.tsx.

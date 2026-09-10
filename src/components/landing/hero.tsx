@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { LogoMark } from "./logo";
 import { Counter } from "./reveal";
+import { StarCount } from "./github-stars";
 import { cn } from "@/lib/utils";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
@@ -1188,7 +1189,8 @@ export function Hero() {
                 className="inline-flex items-center gap-2 rounded-xl border border-stone-900/12 bg-white px-6 py-3.5 text-[15px] font-medium text-stone-800 transition-all hover:-translate-y-0.5 hover:border-stone-900/25 active:translate-y-0"
               >
                 <Github className="h-4 w-4" strokeWidth={1.8} />
-                View on GitHub
+                Star on GitHub
+                <StarCount />
               </a>
             </div>
 

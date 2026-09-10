@@ -4,6 +4,7 @@ import { ArrowRight, Github, Star } from "lucide-react";
 import { motion } from "framer-motion";
 import { LogoMark } from "./logo";
 import { Reveal } from "./reveal";
+import { StarCount } from "./github-stars";
 
 /* ------------------------------------------------------------------ */
 /* final CTA                                                           */
@@ -76,7 +77,8 @@ export function FinalCta() {
                 className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-7 py-3.5 text-[15px] font-medium text-stone-100 transition-colors hover:bg-white/10"
               >
                 <Github className="h-4 w-4" strokeWidth={1.8} />
-                View on GitHub
+                Star on GitHub
+                <StarCount dark />
               </motion.a>
             </div>
           </Reveal>
