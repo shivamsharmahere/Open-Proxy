@@ -289,3 +289,38 @@
 
 /* monospace numerals */
 .tnum { font-variant-numeric: tabular-nums; }
+
+/* slow spin for core status ring (independent of orbit speed) */
+@keyframes opx-spin-26 {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.core-ring {
+  animation: opx-spin-26 26s linear infinite;
+}
+
+/* live event ticker line slide-in */
+@keyframes opx-tick {
+  from { opacity: 0; transform: translateY(7px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.tick-in {
+  animation: opx-tick 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* expanding pulse ring for the orbit hub */
+@keyframes opx-hub {
+  0%       { box-shadow: 0 0 0 0 oklch(0.6 0.14 155 / 0.32); }
+  70%, 100%{ box-shadow: 0 0 0 18px oklch(0.6 0.14 155 / 0); }
+}
+.hub-pulse {
+  animation: opx-hub 2.4s ease-out infinite;
+}
+
+/* dotted blueprint grid inside diagram stage */
+.stage-dots {
+  background-image: radial-gradient(oklch(0.216 0.008 90 / 0.085) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse 85% 95% at 50% 45%, black 25%, transparent 82%);
+  -webkit-mask-image: radial-gradient(ellipse 85% 95% at 50% 45%, black 25%, transparent 82%);
+}

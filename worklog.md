@@ -25,3 +25,33 @@ Verification:
 
 Stage Summary:
 - DONE. Deliverable: SaaS landing page at / (single route), production-quality light premium theme.
+
+---
+Task ID: 2
+Agent: main (Super Z)
+Task: Improve hero + rebuild routing diagram per user feedback ("that can be made better and the routing diagram can also be made better")
+
+Work Log:
+- Rewrote src/components/landing/hero.tsx (579 -> ~1030 lines)
+- Routing diagram rebuilt as "LIVE TOPOLOGY" console panel: header (pulsing dot, meta, live reqs-routed + 429-absorbed counters), aspect-locked stage, footer event ticker (7 rotating log lines, tone-coded dots)
+- Fixed the old visual gap: thick stream now runs core -> hub edge (M 716 218 -> 962), hub = pulsing Terminal chip the stream plugs into
+- Wires upgraded: rpm-encoded stroke widths (1.8+rpm/26), draw-in via framer pathLength, flowing dash overlay, haloed SMIL packets
+- Provider cards gained animated rpm share bars; compact variant uses short names
+- Core upgraded: spinning dashed status ring, glow, "4/4 UP" health pill, glow blob
+- Orbit upgraded: hub + radar dot on inner ring (core-ring 26s), client chips with status dots
+- Added stage captions 01 upstream pools / 02 one endpoint / 03 pooled throughput / 04 every agent
+- Hero left: replaced provider mono line with 4-cell stat strip (166 RPM / 12 keys / +1.8ms / MIT), double-stroke underline on "rate limits."
+- RpmCard: LIVE pill, deterministic seeded utilization sparkline (LCG, SSR-safe) with 166 CEILING dashed line + pulsing end dot, live jittering rpm value
+- globals.css: core-ring, tick-in, hub-pulse, stage-dots additions
+
+Bugs found & fixed during verification:
+- framer-motion scale animation on motion.div clobbered style transform translate(-50%,-50%) -> core/badge/orbit all shifted; fixed by outer static div for positioning + inner motion.div for animation
+- Desktop diagram missing hidden lg:block wrapper after rewrite -> rendered crammed behind mobile panel; restored wrapper
+- Mobile compact cards truncated provider names -> switched to short names
+
+Verification:
+- bun run lint: clean; page 200s, no page errors
+- agent-browser: desktop 1440 + mobile 390 screenshots of hero, diagram, mobile grid — all aligned, animations live, counters ticking
+
+Stage Summary:
+- DONE. Hero + routing diagram significantly upgraded; files touched: hero.tsx, globals.css
