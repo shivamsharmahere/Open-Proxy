@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { motion } from "framer-motion";
+import { motion, useInView } from "framer-motion";
 import {
   ArrowRight,
   Github,
@@ -352,6 +352,93 @@ const CONTACT_CROSSINGS = CLIENTS.map((_, i) => {
   return { chip: i, at: (phi / 360) * SPIN_MS };
 }).sort((a, b) => a.at - b.at);
 
+/* ------------------------------------------------------------------ */
+/* shared live rpm meter — one store drives every live readout          */
+/* (desktop hub, mobile hub, mobile stream badge) so they never         */
+/* disagree. counts 0 -> 166 on first reveal, then breathes around      */
+/* capacity and surges the moment a client powers up on the stream      */
+/* ------------------------------------------------------------------ */
+
+const RPM_CAPACITY = 166;
+
+let rpmValue = 0;
+let rpmArmed = false;
+let rpmDriftT: ReturnType<typeof setTimeout> | undefined;
+const rpmSubs = new Set<(v: number) => void>();
+
+function emitRpm() {
+  rpmSubs.forEach((fn) => fn(rpmValue));
+}
+
+function subscribeRpm(fn: (v: number) => void) {
+  rpmSubs.add(fn);
+  fn(rpmValue);
+  return () => {
+    rpmSubs.delete(fn);
+  };
+}
+
+/* first visible meter arms the store: 0 -> capacity over 2.2s, then drift */
+function armRpm() {
+  if (rpmArmed) return;
+  rpmArmed = true;
+  const D = 2200;
+  const t0 = performance.now();
+  const step = (now: number) => {
+    const p = Math.min(1, (now - t0) / D);
+    rpmValue = Math.round(RPM_CAPACITY * (1 - Math.pow(1 - p, 3)));
+    emitRpm();
+    if (p < 1) requestAnimationFrame(step);
+    else driftTick(900);
+  };
+  requestAnimationFrame(step);
+}
+
+/* mean-reverting random walk around capacity — reads like a real meter */
+function driftTick(delay: number) {
+  if (rpmDriftT !== undefined) return;
+  rpmDriftT = setTimeout(() => {
+    rpmDriftT = undefined;
+    const pull = Math.round((RPM_CAPACITY - rpmValue) * 0.45);
+    const noise = Math.floor(Math.random() * 5) - 2; /* -2..+2 */
+    rpmValue = Math.max(
+      RPM_CAPACITY - 6,
+      Math.min(RPM_CAPACITY + 2, rpmValue + pull + noise)
+    );
+    emitRpm();
+    driftTick(1500 + Math.random() * 1300);
+  }, delay);
+}
+
+/* power-up surge — a served request kicks the meter, drift decays it back */
+function surgeRpm() {
+  if (!rpmArmed || rpmValue < RPM_CAPACITY - 20) return; /* still counting up */
+  rpmValue = Math.min(
+    RPM_CAPACITY + 5,
+    rpmValue + 1 + Math.floor(Math.random() * 2)
+  );
+  emitRpm();
+}
+
+/* live rpm readout — every instance on the page shows the same value */
+function LiveRpm({ className }: { className?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-40px" });
+  const [v, setV] = useState(0);
+
+  useEffect(() => {
+    if (inView) armRpm();
+  }, [inView]);
+
+  useEffect(() => subscribeRpm(setV), []);
+
+  return (
+    <span ref={ref} className={cn("tnum", className)}>
+      {v}
+    </span>
+  );
+}
+
 function Orbit({ scale = 1 }: { scale?: number }) {
   const compact = scale < 1;
   const [flash, setFlash] = useState<{
@@ -389,12 +476,13 @@ function Orbit({ scale = 1 }: { scale?: number }) {
         if (count % 4 === 0) {
           /* every 4th contact: a 429 gets absorbed, retried, then powered */
           setFlash({ i, mode: "retry", count });
-          retryT = setTimeout(
-            () => setFlash({ i, mode: "served", count: count + 0.5 }),
-            550
-          );
+          retryT = setTimeout(() => {
+            setFlash({ i, mode: "served", count: count + 0.5 });
+            surgeRpm(); /* the late-served request still adds throughput */
+          }, 550);
         } else {
           setFlash({ i, mode: "served", count });
+          surgeRpm(); /* meter kicks the instant a client powers up */
         }
       }
       raf = requestAnimationFrame(tick);
@@ -438,7 +526,7 @@ function Orbit({ scale = 1 }: { scale?: number }) {
               compact ? "text-[12px]" : "text-[15px]"
             )}
           >
-            <Counter to={166} duration={2.2} />
+            <LiveRpm />
           </span>
           <span
             className={cn(
@@ -831,7 +919,7 @@ function HeroDiagramMobile() {
             </div>
             <div className="glass absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-xl px-3 py-1.5 text-center">
               <p className="tnum font-mono text-sm font-bold leading-none text-emerald-700">
-                166 <span className="text-[9px] font-semibold uppercase tracking-wider text-stone-500">rpm combined</span>
+                <LiveRpm /> <span className="text-[9px] font-semibold uppercase tracking-wider text-stone-500">rpm combined</span>
               </p>
             </div>
           </div>

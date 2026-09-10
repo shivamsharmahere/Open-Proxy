@@ -120,3 +120,26 @@ Work Log:
 
 Stage Summary:
 - VERIFIED. /docs page fully functional on desktop + mobile; no regressions on landing. No code changes needed in this pass.
+
+---
+Task ID: 5
+Agent: main (Super Z)
+Task: Make the hub's 166 RPM figure live ("this 166 RPM is not fixed should we do something to it?")
+
+Work Log:
+- Diagnosis: hub used <Counter to={166}> which counts 0->166 once on reveal then freezes forever — a dead number inside a "LIVE TOPOLOGY" console (mobile stream glass badge was hardcoded static 166 too)
+- Built a module-scope shared rpm store in hero.tsx: rpmValue + subscriber set + armRpm() (0->166 count-up over 2.2s cubic ease-out via rAF, gated on first LiveRpm entering viewport) -> driftTick() (mean-reverting random walk around capacity 166, noise -2..+2, clamped [160,168], every 1.5-2.8s)
+- surgeRpm(): +1..2 kick capped at 171, ignored while still counting up; wired into Orbit's rAF contact scheduler — fires on direct served flash AND inside the retry->served 550ms timeout, so the meter causally responds to the chip power-up effect from Task 3
+- New <LiveRpm> component (useInView gate + store subscription); replaced hub Counter (desktop + compact) and the mobile glass badge figure — all instances render the SAME shared value, never disagree
+- Left capacity/spec numbers untouched: left stat strip "166 RPM pooled throughput", RpmCard "166 RPM pooled" + 166 CEILING line, "80+40+16+50=166" caption, ticker text
+- Note: at 1440x900 the hub sits below the -40px inView margin on load, so the count-up arms on first actual visibility (scroll) — verified intended
+
+Verification:
+- bun run lint: clean; GET / 200
+- 9s sampling of hub value @250ms: 165->164->167->165 (drift) then 165->169 @7.75-8s (surge — 169 exceeds drift ceiling 168, proving contact kick) then decay 169->168 (mean reversion)
+- Mobile 390: badge "168 rpm combined" + hub "168" in sync; 2.6s later both "163" — shared store keeps every meter identical
+- Desktop screenshot shows hub at 168 RPM COMBINED with console counters live; console clean, no page errors
+- Screenshots kept: download/verify-live-rpm-desktop.png, download/verify-live-rpm-mobile.png
+
+Stage Summary:
+- DONE. Hub RPM is now a live meter: counts up on reveal, breathes 160-168 around capacity, surges when a client powers up on the stream, decays back. All rpm readouts share one store. Files touched: hero.tsx only.
