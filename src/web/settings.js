@@ -131,7 +131,7 @@ function renderAccess() {
       <button class="dbtn" data-style="margin-left:auto" data-ckdel="${i}" data-i18n="settings.client_key.revoke"></button>
     </div>`).join('');
   const groupOptions = groups.map(g =>
-    `<option value="${escapeHtml(g.name)}">${escapeHtml(g.name)}</option>`).join('');
+    `<option value="${escapeHtml(g.name)}" title="${escapeHtml(g.base_url)}">${escapeHtml(g.name)} (${escapeHtml(g.base_url.replace(/^https?:\/\//, '').replace(/\/.*$/, ''))})</option>`).join('');
   const groupKeyCount = n => {
     const params = { n: NUM_GROUPED.format(n) };
     switch (PLURALS.select(n)) {

@@ -433,9 +433,26 @@ pub async fn probe_key(http: &reqwest::Client, base_url: &str, key: &str) -> Res
                 .map_err(|e| format!("upstream sent an unreadable model list: {e}"))?;
             Ok(v["data"].as_array().map(|a| a.len()).unwrap_or(0))
         }
-        Ok(resp) => Err(format!("upstream rejected the key ({})", resp.status())),
+        // Name the upstream in the error: a 401 from the wrong provider is
+        // indistinguishable from a bad key, so "upstream rejected" alone sends
+        // operators chasing a key fault when the group simply points elsewhere.
+        Ok(resp) => Err(format!(
+            "{host} rejected the key ({status})",
+            host = upstream_host(base_url),
+            status = resp.status(),
+        )),
         Err(e) => Err(format!("cannot reach upstream: {e}")),
     }
+}
+
+/// Host (with optional port) of a base URL for error text, without leaking
+/// path or credentials into operator-visible strings.
+fn upstream_host(base_url: &str) -> &str {
+    let no_scheme = base_url
+        .split_once("://")
+        .map(|(_, rest)| rest)
+        .unwrap_or(base_url);
+    no_scheme.split('/').next().unwrap_or(no_scheme)
 }
 
 // ---------------------------------------------------------------------------
