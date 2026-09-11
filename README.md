@@ -200,7 +200,7 @@ live. The config file itself is read at boot; an out-of-band edit to
 - **Heartbeats instead of failures.** For streaming requests the proxy commits to `200 text/event-stream` immediately and emits SSE comment lines (`: heartbeat` — ignored by every OpenAI client) while it waits for a slot or rides out upstream 429/500/502/503/504 with `Retry-After` honored and instant failover between keys. Streams that stall mid-generation are cut after the `stream_idle` limit.
 - **Optional absolute deadlines.** `X-Nim-Proxy-Deadline-Ms` bounds the whole request independently of heartbeats or socket activity. Expiry cancels queue/retry/upstream work and releases its key, model, and in-flight ownership.
 - **Model-pressure aware.** Some providers cap per-model worker concurrency independently of the per-key rate limit; the proxy detects that specific exhaustion, backs off the affected *model* adaptively (never wasting healthy key capacity on failover), and surfaces it on the dashboard — see [architecture: governor](knowledge/architecture/governor.md).
-- **Pass-through with one exception.** Bodies are forwarded untouched, except: streaming chat requests get `stream_options: {"include_usage": true}` injected so token accounting is exact rather than estimated. If a model rejects the field, the proxy retries untouched and never injects for that model again. `strict_passthrough` in Settings disables injection entirely.
+- **Pass-through with one exception.** Bodies are forwarded untouched, except: streaming chat requests get `stream_options: {"include_usage": true}` injected so token accounting is exact rather than estimated. If a model rejects the field, the proxy retries untouched and never injects for that model again. `strict_passthrough` in Settings disables injection entirely. **Estimation fallback.** When upstream usage is still absent, the proxy estimates rather than leaves gaps: completion tokens from the SSE event count, prompt tokens as request characters ÷ 4 (clamped to at least 1). Estimates never mix with measured totals — they're recorded under `source="estimate"` and reported separately in the usage-quality metric.
 - **Local answers where possible.** `GET /v1/models` is cached (10 min default, single-flight refresh), so client catalog polls don't burn rate budget. With several endpoint groups the catalog fans out (one slot per group that has a key) and merges by model id, minus globally disabled models.
 
 ## Configuration
@@ -322,7 +322,7 @@ The build and release path is hardened to the OpenSSF baseline (scored weekly by
 |---|---|---|
 | `nimproxy_requests_total` | client, model, path, status | Every request (`status` includes `disconnect`, `stall`, `stream_error`, `deadline`) |
 | `nimproxy_deadline_exceeded_total` | client, model, path | Requests stopped by `X-Nim-Proxy-Deadline-Ms` |
-| `nimproxy_prompt_tokens_total` | client, model | Prompt tokens, from upstream `usage` |
+| `nimproxy_prompt_tokens_total` | client, model, source | Prompt tokens; `usage` = exact, `estimate` = chars÷4 heuristic fallback when upstream omits usage |
 | `nimproxy_completion_tokens_total` | client, model, source | Completion tokens; `usage` = exact, `estimate` = per-SSE-event fallback |
 | `nimproxy_ttft_seconds` | model | Upstream send → first streamed byte |
 | `nimproxy_tokens_per_second` | model, source | Generation speed |

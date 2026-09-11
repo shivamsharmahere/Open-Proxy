@@ -98,9 +98,7 @@ impl Upstream {
     /// Normalize base URL: strip trailing `/v1` and slashes so downstream
     /// path-appending never produces double-v1 paths.
     pub fn normalize_base_url(url: &str) -> String {
-        url.trim_end_matches("/v1")
-            .trim_end_matches('/')
-            .to_owned()
+        url.trim_end_matches("/v1").trim_end_matches('/').to_owned()
     }
 }
 
@@ -358,21 +356,25 @@ impl StoredConfig {
     /// state carriers so a disable→enable cycle can't reset their windows.
     pub fn pool_specs(&self) -> Vec<crate::pool::LaneSpec> {
         let mut specs = Vec::new();
-        let mut push_group =
-            |idx: usize, name: &str, base_url: &str, group_enabled: bool, keys: &[NimKey], supports_stream_options: bool| {
-                let base_url = base_url.trim_end_matches('/').to_owned();
-                for k in keys {
-                    specs.push(crate::pool::LaneSpec {
-                        key: k.key.clone(),
-                        rpm: k.rpm,
-                        enabled: k.enabled && group_enabled,
-                        endpoint: idx,
-                        base_url: base_url.clone(),
-                        upstream: name.to_owned(),
-                        supports_stream_options,
-                    });
-                }
-            };
+        let mut push_group = |idx: usize,
+                              name: &str,
+                              base_url: &str,
+                              group_enabled: bool,
+                              keys: &[NimKey],
+                              supports_stream_options: bool| {
+            let base_url = base_url.trim_end_matches('/').to_owned();
+            for k in keys {
+                specs.push(crate::pool::LaneSpec {
+                    key: k.key.clone(),
+                    rpm: k.rpm,
+                    enabled: k.enabled && group_enabled,
+                    endpoint: idx,
+                    base_url: base_url.clone(),
+                    upstream: name.to_owned(),
+                    supports_stream_options,
+                });
+            }
+        };
         push_group(
             0,
             PRIMARY_UPSTREAM,
@@ -382,7 +384,14 @@ impl StoredConfig {
             self.upstream.supports_stream_options,
         );
         for (i, ep) in self.upstreams.iter().enumerate() {
-            push_group(i + 1, &ep.name, &ep.base_url, ep.enabled, &ep.keys, ep.supports_stream_options);
+            push_group(
+                i + 1,
+                &ep.name,
+                &ep.base_url,
+                ep.enabled,
+                &ep.keys,
+                ep.supports_stream_options,
+            );
         }
         specs
     }

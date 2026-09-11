@@ -21,3 +21,4 @@ description: Lightweight ADRs — context, options, choice, consequences.
 - [ui-managed-config-store](ui-managed-config-store.md)
 - [explicit-request-deadline](explicit-request-deadline.md)
 - [dependency-update-cooldown](dependency-update-cooldown.md)
+- [prompt-tokens-heuristic-estimate](prompt-tokens-heuristic-estimate.md)

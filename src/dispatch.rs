@@ -117,7 +117,8 @@ async fn run(handle: PoolHandle, mut queue: mpsc::UnboundedReceiver<Waiter>) {
                     // Read the lane's endpoint metadata from the granting
                     // pool generation (`pool`), never the live handle, which
                     // a settings save may have swapped since the grant.
-                    let (base_url, upstream, endpoint, supports_stream_options) = pool.lane_endpoint(lane);
+                    let (base_url, upstream, endpoint, supports_stream_options) =
+                        pool.lane_endpoint(lane);
                     let slot = Slot {
                         pool: pool.clone(),
                         lane,

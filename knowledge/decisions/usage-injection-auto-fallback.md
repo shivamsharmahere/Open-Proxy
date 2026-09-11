@@ -3,7 +3,7 @@ type: Decision
 title: Usage injection with automatic 400 fallback
 description: Streaming chat requests get stream_options include_usage injected for exact token accounting; models that reject it are remembered and never injected again.
 tags: [metrics, pass-through, streaming]
-timestamp: 2026-07-02T00:00:00Z
+timestamp: 2026-09-11T00:00:00Z
 ---
 
 # Usage injection with automatic 400 fallback
@@ -37,10 +37,13 @@ existing `stream_options`.
 
 ## Consequences
 
-- Exact token counts (`source="usage"`) become the norm; estimates remain
-  only for completed streams with no measured completion and valid countable
-  nonterminal SSE events. Invalid, incomplete, error, and unobservable events
-  do not become estimates; see [NIM observations](../architecture/nim-observations.md).
+- Exact token counts (`source="usage"`) become the norm. Where usage is still
+  absent, two bounded estimators cover the gap: completion tokens from the
+  event count of a completed stream with valid countable nonterminal SSE
+  events, and prompt tokens from the request-side
+  [chars÷4 heuristic](prompt-tokens-heuristic-estimate.md). Invalid,
+  incomplete, error, and unobservable events do not become estimates; see
+  [NIM observations](../architecture/nim-observations.md).
 - One extra upstream request the first time a rejecting model is seen, per
   process lifetime.
 - Covered e2e: injection presence, 400-fallback-and-remember, and the kill

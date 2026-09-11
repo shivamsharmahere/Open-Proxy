@@ -207,8 +207,8 @@ impl UsageState {
         }
     }
 
-    fn finish(self, estimate: Option<u64>) -> UsageObservations {
-        let prompt = self.prompt.result();
+    fn finish(self, estimate: Option<u64>, prompt_estimate: Option<u64>) -> UsageObservations {
+        let mut prompt = self.prompt.result();
         let mut completion = self.completion.result();
         let mut total = self.total.result();
         let mut cached = self.cached.result();
@@ -238,6 +238,11 @@ impl UsageState {
         if matches!(completion, Observation::Unavailable) {
             if let Some(count) = estimate.filter(|count| *count > 0) {
                 completion = Observation::Estimated(count);
+            }
+        }
+        if matches!(prompt, Observation::Unavailable) {
+            if let Some(count) = prompt_estimate.filter(|count| *count > 0) {
+                prompt = Observation::Estimated(count);
             }
         }
         UsageObservations {
@@ -445,6 +450,7 @@ impl ObservationState {
         outcome: StreamOutcome,
         incomplete: bool,
         estimate: Option<u64>,
+        prompt_estimate: Option<u64>,
     ) -> ResponseObservations {
         let usage = if matches!(
             outcome,
@@ -452,7 +458,7 @@ impl ObservationState {
         ) {
             unavailable_usage()
         } else {
-            self.usage.finish(estimate)
+            self.usage.finish(estimate, prompt_estimate)
         };
         let tool_calls = if incomplete {
             Observation::Unavailable
@@ -601,7 +607,11 @@ impl SseObserver {
         }
     }
 
-    pub(crate) fn finish(mut self, outcome: StreamOutcome) -> ResponseObservations {
+    pub(crate) fn finish(
+        mut self,
+        outcome: StreamOutcome,
+        prompt_estimate: Option<u64>,
+    ) -> ResponseObservations {
         let unterminated =
             self.discarded_event || !self.current_data.is_empty() || !self.current_line.is_empty();
         if outcome == StreamOutcome::Completed && unterminated {
@@ -610,7 +620,8 @@ impl SseObserver {
         let incomplete = outcome != StreamOutcome::Completed || unterminated;
         let estimate = (outcome == StreamOutcome::Completed && !unterminated)
             .then_some(self.completion_events);
-        self.state.finish(outcome, incomplete, estimate)
+        self.state
+            .finish(outcome, incomplete, estimate, prompt_estimate)
     }
 
     #[cfg(test)]
@@ -619,12 +630,12 @@ impl SseObserver {
     }
 }
 
-pub(crate) fn observe_buffered(body: &[u8]) -> ResponseObservations {
+pub(crate) fn observe_buffered(body: &[u8], prompt_estimate: Option<u64>) -> ResponseObservations {
     let mut state = ObservationState::default();
     if let Ok(value) = serde_json::from_slice::<serde_json::Value>(body) {
         state.observe_buffered(&value);
     }
-    state.finish(StreamOutcome::Completed, false, None)
+    state.finish(StreamOutcome::Completed, false, None, prompt_estimate)
 }
 
 fn unavailable_usage() -> UsageObservations {
@@ -640,10 +651,17 @@ fn unavailable_usage() -> UsageObservations {
 #[cfg(test)]
 mod tests {
     use super::{
-        observe_buffered, usage_observation_metrics, FinishObservation, FinishReason, FinishResult,
-        Observation, ObservationState, ResponseObservations, SseObserver, StreamOutcome,
-        UsageObservationMetric, UsageObservations, MAX_INDEXED_STREAM_OBSERVATIONS,
+        usage_observation_metrics, FinishObservation, FinishReason, FinishResult, Observation,
+        ObservationState, ResponseObservations, SseObserver, StreamOutcome, UsageObservationMetric,
+        UsageObservations, MAX_INDEXED_STREAM_OBSERVATIONS,
     };
+
+    /// Existing call sites predate the prompt-estimate parameter and all mean
+    /// "no request-side estimate"; prompt-estimate behavior is exercised by
+    /// dedicated tests calling `super::observe_buffered(body, Some(n))`.
+    fn observe_buffered(body: &[u8]) -> ResponseObservations {
+        super::observe_buffered(body, None)
+    }
 
     #[test]
     fn observation_metric_records_each_final_usage_result_with_closed_labels() {
@@ -691,7 +709,7 @@ mod tests {
         // client disconnect instead of counting all five unavailable fields.
         let mut observer = SseObserver::default();
         observer.push(b"data: {\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":2}}\n\n");
-        let usage = observer.finish(StreamOutcome::Disconnected).usage;
+        let usage = observer.finish(StreamOutcome::Disconnected, None).usage;
 
         assert_eq!(
             usage_observation_metrics(&usage),
@@ -772,7 +790,7 @@ mod tests {
             observer.push(event);
 
             assert_eq!(
-                usage_observation_metrics(&observer.finish(outcome).usage),
+                usage_observation_metrics(&observer.finish(outcome, None).usage),
                 vec![
                     UsageObservationMetric {
                         field: "prompt_tokens",
@@ -887,7 +905,7 @@ mod tests {
             let mut observer = SseObserver::default();
             observer.push(&fixture_body(name));
             assert_fixture_outcome(
-                observer.finish(StreamOutcome::Completed),
+                observer.finish(StreamOutcome::Completed, None),
                 finish,
                 tools,
                 "old SseScan line scanner",
@@ -957,12 +975,64 @@ mod tests {
     }
 
     #[test]
+    fn prompt_estimate_fills_unavailable_field() {
+        // Mutation caught: a finalized response that omits prompt usage must
+        // backfill prompt_tokens from the request-side estimate instead of
+        // leaving the field unavailable. Buffered and streamed responses share
+        // the same finish path.
+        let actual = super::observe_buffered(br#"{"choices":[]}"#, Some(7));
+        assert_eq!(actual.usage.prompt_tokens, Observation::Estimated(7));
+        assert_eq!(
+            actual.usage.completion_tokens,
+            Observation::Unavailable,
+            "the prompt estimate must not leak into unrelated fields"
+        );
+
+        let mut observer = SseObserver::default();
+        observer.push(b"data: {\"choices\":[{\"index\":0,\"delta\":{}}]}\n\n");
+        let actual = observer.finish(StreamOutcome::Completed, Some(7));
+        assert_eq!(actual.usage.prompt_tokens, Observation::Estimated(7));
+    }
+
+    #[test]
+    fn prompt_estimate_ignored_when_measured() {
+        // Mutation caught: replacing — instead of backfilling — an upstream
+        // prompt value with the request-side heuristic. Measured values keep
+        // their exact count, and a malformed value stays invalid rather than
+        // being laundered into a plausible-looking estimate.
+        let actual =
+            super::observe_buffered(br#"{"choices":[],"usage":{"prompt_tokens":42}}"#, Some(7));
+        assert_eq!(actual.usage.prompt_tokens, Observation::Measured(42));
+
+        let actual =
+            super::observe_buffered(br#"{"choices":[],"usage":{"prompt_tokens":"42"}}"#, Some(7));
+        assert_eq!(actual.usage.prompt_tokens, Observation::Invalid);
+    }
+
+    #[test]
+    fn prompt_estimate_zero_becomes_unavailable() {
+        // Mutation caught: a zero estimate publishes Estimated(0), a measured-
+        // looking value for a prompt nothing was counted from. Zero is
+        // "nothing countable", and nothing countable stays unavailable.
+        let actual = super::observe_buffered(br#"{"choices":[]}"#, Some(0));
+        assert_eq!(actual.usage.prompt_tokens, Observation::Unavailable);
+    }
+
+    #[test]
+    fn prompt_estimate_none_keeps_unavailable() {
+        // Mutation caught: finish() inventing a prompt estimate when no
+        // request-side estimate was supplied at all.
+        let actual = super::observe_buffered(br#"{"choices":[]}"#, None);
+        assert_eq!(actual.usage.prompt_tokens, Observation::Unavailable);
+    }
+
+    #[test]
     fn deadline_preserves_observed_usage_without_estimating_or_completing_the_stream() {
         // Mutation caught: treating a deadline like a disconnect/truncation
         // discards already-observed usage before its one final accounting.
         let mut observer = SseObserver::default();
         observer.push(b"data: {\"choices\":[{\"index\":0,\"delta\":{}}],\"usage\":{\"prompt_tokens\":7,\"completion_tokens\":3,\"total_tokens\":10}}\n\n");
-        let actual = observer.finish(StreamOutcome::Deadline);
+        let actual = observer.finish(StreamOutcome::Deadline, None);
         assert_eq!(actual.usage.prompt_tokens, Observation::Measured(7));
         assert_eq!(actual.usage.completion_tokens, Observation::Measured(3));
         assert_eq!(actual.usage.total_tokens, Observation::Measured(10));
@@ -1020,7 +1090,7 @@ mod tests {
             observer.push(&bytes[..split]);
             observer.push(&bytes[split..]);
             assert_fixture_outcome(
-                observer.finish(StreamOutcome::Completed),
+                observer.finish(StreamOutcome::Completed, None),
                 FinishReason::Stop,
                 0,
                 "split/CRLF/multi-line SSE parser",
@@ -1034,7 +1104,7 @@ mod tests {
         // duplicate usage, cached, or reasoning presentations.
         let mut observer = SseObserver::default();
         observer.push(b"data: {\"choices\":[],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":2}}\n\ndata: {\"choices\":[],\"usage\":{\"prompt_tokens\":2,\"completion_tokens\":2,\"prompt_tokens_details\":{\"cached_tokens\":3},\"completion_tokens_details\":{\"reasoning_tokens\":3}}}\n\n");
-        let actual = observer.finish(StreamOutcome::Completed);
+        let actual = observer.finish(StreamOutcome::Completed, None);
         assert_eq!(actual.usage.prompt_tokens, Observation::Invalid);
         assert_eq!(actual.usage.completion_tokens, Observation::Measured(2));
         assert_eq!(actual.usage.cached_tokens, Observation::Invalid);
@@ -1042,7 +1112,7 @@ mod tests {
 
         let mut equal_duplicates = SseObserver::default();
         equal_duplicates.push(b"data: {\"choices\":[],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":2}}\n\ndata: {\"choices\":[],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":2}}\n\n");
-        let actual = equal_duplicates.finish(StreamOutcome::Completed);
+        let actual = equal_duplicates.finish(StreamOutcome::Completed, None);
         assert_eq!(actual.usage.prompt_tokens, Observation::Measured(1));
         assert_eq!(actual.usage.completion_tokens, Observation::Measured(2));
     }
@@ -1095,7 +1165,7 @@ mod tests {
 
         let mut observer = SseObserver::default();
         observer.push(b"data: {\"choices\":[],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":2,\"completion_tokens_details\":{\"reasoning_tokens\":1}}}\n\ndata: {\"choices\":[],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":3}}\n\n");
-        let actual = observer.finish(StreamOutcome::Completed);
+        let actual = observer.finish(StreamOutcome::Completed, None);
         assert_eq!(actual.usage.prompt_tokens, Observation::Measured(1));
         assert_eq!(actual.usage.completion_tokens, Observation::Invalid);
         assert_eq!(actual.usage.reasoning_tokens, Observation::Invalid);
@@ -1177,7 +1247,7 @@ mod tests {
         let mut observer = SseObserver::default();
         observer.push(b"data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0},{\"index\":0}]}}]}\n\ndata: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":1}]}}]}\n\n");
         assert_eq!(
-            observer.finish(StreamOutcome::Completed).tool_calls,
+            observer.finish(StreamOutcome::Completed, None).tool_calls,
             Observation::Measured(2)
         );
 
@@ -1186,7 +1256,7 @@ mod tests {
             b"data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":-1}]}}]}\n\n",
         );
         assert_eq!(
-            malformed.finish(StreamOutcome::Completed).tool_calls,
+            malformed.finish(StreamOutcome::Completed, None).tool_calls,
             Observation::Invalid
         );
 
@@ -1205,7 +1275,7 @@ mod tests {
             let mut observer = SseObserver::default();
             observer.push(bytes);
             assert_eq!(
-                observer.finish(StreamOutcome::Completed).tool_calls,
+                observer.finish(StreamOutcome::Completed, None).tool_calls,
                 Observation::Invalid,
                 "malformed streamed tool-call presentation must be invalid"
             );
@@ -1217,7 +1287,7 @@ mod tests {
         ] {
             let mut observer = SseObserver::default();
             observer.push(bytes);
-            let actual = observer.finish(StreamOutcome::Completed);
+            let actual = observer.finish(StreamOutcome::Completed, None);
             assert_eq!(actual.tool_calls, Observation::Invalid);
             assert!(
                 actual.finish_reasons.is_empty(),
@@ -1247,7 +1317,7 @@ mod tests {
         bounded.push(
             b"data: {\"choices\":[{\"index\":17,\"delta\":{\"tool_calls\":[{\"index\":17}]},\"finish_reason\":\"stop\"}]}\n\n",
         );
-        let bounded = bounded.finish(StreamOutcome::Completed);
+        let bounded = bounded.finish(StreamOutcome::Completed, None);
         assert_eq!(
             bounded.finish_reasons.first(),
             Some(&FinishObservation {
@@ -1282,7 +1352,7 @@ mod tests {
             "ever-new tool indexes must not grow retained deduplication state"
         );
 
-        let overflowed = overflowed.finish(StreamOutcome::Completed);
+        let overflowed = overflowed.finish(StreamOutcome::Completed, None);
         assert_eq!(
             overflowed.finish_reasons.len(),
             MAX_INDEXED_STREAM_OBSERVATIONS
@@ -1328,7 +1398,7 @@ mod tests {
         );
         assert!(state.finishes_overflowed);
 
-        let actual = state.finish(StreamOutcome::Completed, false, None);
+        let actual = state.finish(StreamOutcome::Completed, false, None, None);
         assert_eq!(actual.finish_reasons.len(), MAX_INDEXED_STREAM_OBSERVATIONS);
         assert!(
             actual
@@ -1351,7 +1421,7 @@ mod tests {
         let mut observer = SseObserver::default();
         observer.push(format!("data: {}", serde_json::json!({"choices": choices})).as_bytes());
 
-        let actual = observer.finish(StreamOutcome::Completed);
+        let actual = observer.finish(StreamOutcome::Completed, None);
         assert_eq!(
             actual.finish_reasons.len(),
             MAX_INDEXED_STREAM_OBSERVATIONS,
@@ -1397,7 +1467,7 @@ mod tests {
         observer.push(b"data: {\"choices\":[{\"index\":0,\"delta\":{}}]}\n\n");
         assert_eq!(
             observer
-                .finish(StreamOutcome::Completed)
+                .finish(StreamOutcome::Completed, None)
                 .usage
                 .completion_tokens,
             Observation::Estimated(1)
@@ -1411,7 +1481,7 @@ mod tests {
         let mut zero = SseObserver::default();
         zero.push(b"data: [DONE]\n\ndata: {\"choices\":[]}\n\n");
         assert_eq!(
-            zero.finish(StreamOutcome::Completed)
+            zero.finish(StreamOutcome::Completed, None)
                 .usage
                 .completion_tokens,
             Observation::Unavailable
@@ -1421,7 +1491,7 @@ mod tests {
         measured.push(b"data: {\"choices\":[{\"index\":0,\"delta\":{}}]}\n\ndata: {\"choices\":[],\"usage\":{\"completion_tokens\":7}}\n\n");
         assert_eq!(
             measured
-                .finish(StreamOutcome::Completed)
+                .finish(StreamOutcome::Completed, None)
                 .usage
                 .completion_tokens,
             Observation::Measured(7)
@@ -1431,7 +1501,7 @@ mod tests {
         invalid.push(b"data: {\"choices\":[{\"index\":0,\"delta\":{}}],\"usage\":{\"completion_tokens\":\"2\"}}\n\n");
         assert_eq!(
             invalid
-                .finish(StreamOutcome::Completed)
+                .finish(StreamOutcome::Completed, None)
                 .usage
                 .completion_tokens,
             Observation::Invalid
@@ -1441,7 +1511,7 @@ mod tests {
         conflicting.push(b"data: {\"choices\":[{\"index\":0,\"delta\":{}}],\"usage\":{\"completion_tokens\":2}}\n\ndata: {\"choices\":[],\"usage\":{\"completion_tokens\":3}}\n\n");
         assert_eq!(
             conflicting
-                .finish(StreamOutcome::Completed)
+                .finish(StreamOutcome::Completed, None)
                 .usage
                 .completion_tokens,
             Observation::Invalid
@@ -1451,7 +1521,7 @@ mod tests {
         usage_only.push(b"data: {\"choices\":[],\"usage\":{\"completion_tokens\":2}}\n\n");
         assert_eq!(
             usage_only
-                .finish(StreamOutcome::Completed)
+                .finish(StreamOutcome::Completed, None)
                 .usage
                 .completion_tokens,
             Observation::Measured(2),
@@ -1462,7 +1532,7 @@ mod tests {
         comment_only.push(b": keepalive\n\n");
         assert_eq!(
             comment_only
-                .finish(StreamOutcome::Completed)
+                .finish(StreamOutcome::Completed, None)
                 .usage
                 .completion_tokens,
             Observation::Unavailable,
@@ -1473,7 +1543,7 @@ mod tests {
         json_error.push(b"data: {\"error\":{\"message\":\"redacted\"}}\n\n");
         assert_eq!(
             json_error
-                .finish(StreamOutcome::Completed)
+                .finish(StreamOutcome::Completed, None)
                 .usage
                 .completion_tokens,
             Observation::Unavailable,
@@ -1485,7 +1555,7 @@ mod tests {
             .push(b"data: {\"choices\":[],\"usage\":{\"prompt_tokens\":1}}\n\n");
         assert_eq!(
             usage_without_completion
-                .finish(StreamOutcome::Completed)
+                .finish(StreamOutcome::Completed, None)
                 .usage
                 .completion_tokens,
             Observation::Unavailable,
@@ -1504,7 +1574,7 @@ mod tests {
             observer.push(bytes);
             assert_eq!(
                 observer
-                    .finish(StreamOutcome::Completed)
+                    .finish(StreamOutcome::Completed, None)
                     .usage
                     .completion_tokens,
                 Observation::Unavailable,
@@ -1516,7 +1586,7 @@ mod tests {
         counted.push(b"data: {\"choices\":[{\"index\":0,\"delta\":{}}]}\n\ndata: {\"choices\":[{\"index\":1,\"delta\":{}}]}\n\ndata: {\"choices\":[{\"index\":0,\"delta\":{}}]}\n\n");
         assert_eq!(
             counted
-                .finish(StreamOutcome::Completed)
+                .finish(StreamOutcome::Completed, None)
                 .usage
                 .completion_tokens,
             Observation::Estimated(3)
@@ -1529,7 +1599,7 @@ mod tests {
         // measured or estimated instead of treating the observation as truncated.
         let mut observer = SseObserver::default();
         observer.push(b"data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":2}}");
-        let actual = observer.finish(StreamOutcome::Completed);
+        let actual = observer.finish(StreamOutcome::Completed, None);
         assert_eq!(actual.usage.prompt_tokens, Observation::Unavailable);
         assert_eq!(actual.usage.completion_tokens, Observation::Unavailable);
         assert_eq!(actual.usage.total_tokens, Observation::Unavailable);
@@ -1552,7 +1622,7 @@ mod tests {
         for outcome in [StreamOutcome::Disconnected, StreamOutcome::Truncated] {
             let mut observer = SseObserver::default();
             observer.push(b"data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":2}}\n\n");
-            let actual = observer.finish(outcome);
+            let actual = observer.finish(outcome, None);
             assert_eq!(actual.usage.prompt_tokens, Observation::Unavailable);
             assert_eq!(actual.usage.completion_tokens, Observation::Unavailable);
             assert_eq!(actual.tool_calls, Observation::Unavailable);
@@ -1581,7 +1651,7 @@ mod tests {
         observer.push(b"\n\ndata: {\"choices\":[{\"index\":0,\"delta\":{}}]}\n\n");
         assert_eq!(
             observer
-                .finish(StreamOutcome::Completed)
+                .finish(StreamOutcome::Completed, None)
                 .usage
                 .completion_tokens,
             Observation::Estimated(1),
@@ -1592,7 +1662,7 @@ mod tests {
         malformed.push(b"data: {]\n\ndata: {\"choices\":[{\"index\":0,\"delta\":{}}]}\n\n");
         assert_eq!(
             malformed
-                .finish(StreamOutcome::Completed)
+                .finish(StreamOutcome::Completed, None)
                 .usage
                 .completion_tokens,
             Observation::Estimated(1),
@@ -1603,7 +1673,7 @@ mod tests {
         invalid_utf8.push(b"data: \xff\n\ndata: {\"choices\":[{\"index\":0,\"delta\":{}}]}\n\n");
         assert_eq!(
             invalid_utf8
-                .finish(StreamOutcome::Completed)
+                .finish(StreamOutcome::Completed, None)
                 .usage
                 .completion_tokens,
             Observation::Estimated(1),
@@ -1629,7 +1699,7 @@ mod tests {
 
             let mut observer = SseObserver::default();
             observer.push(&bytes);
-            let actual = observer.finish(StreamOutcome::Completed);
+            let actual = observer.finish(StreamOutcome::Completed, None);
             assert_eq!(actual.usage.prompt_tokens, Observation::Unavailable);
             assert_eq!(actual.usage.completion_tokens, Observation::Estimated(1));
             assert_eq!(actual.tool_calls, Observation::Measured(0));

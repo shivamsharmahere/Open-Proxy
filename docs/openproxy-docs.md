@@ -449,7 +449,7 @@ curl http://localhost:8000/v1/chat/completions \
 
 Standard OpenAI chat completion response. When `stream: true`, standard SSE streaming with `: heartbeat\n\n` comments every 10 seconds to keep connections alive.
 
-Token usage is accurate — the proxy injects `stream_options: { include_usage: true }` automatically.
+Token usage is accurate — the proxy injects `stream_options: { include_usage: true }` automatically. When a response still arrives without usage (a provider that ignores the option, or a buffered reply without a `usage` object), the proxy falls back to estimates: completion tokens are counted from SSE events, and prompt tokens are estimated as request characters ÷ 4 (minimum 1). Estimated values are labeled `source="estimate"` and kept separate from measured `source="usage"` totals, so you can always tell exact accounting from heuristic accounting.
 
 ---
 
@@ -586,6 +586,10 @@ For streaming requests, the proxy sends `: heartbeat\n\n` every `heartbeat_secs`
 ### Stream Options Injection
 
 For streaming chat completions, the proxy injects `"stream_options": {"include_usage": true}` so token usage is exact. If a model rejects this (400), the proxy retries without it and disables injection for that model.
+
+### Usage Estimation Fallback
+
+When a provider doesn't return usage despite injection (or on a model where injection was disabled), token counters don't go silent: completion tokens are estimated from the number of non-terminal SSE `data:` events, and prompt tokens are estimated as the request's character count divided by 4, clamped to a minimum of 1. Estimates are always distinguishable: token counters carry a `source` label (`usage` for exact values, `estimate` for heuristics), and `nimproxy_usage_observations_total{field, result="measured|estimated|unavailable|invalid"}` exposes the observed quality of every usage field. Partial streams are never estimated for completion — if a stream disconnects or truncates, the proxy records no estimate rather than guessing.
 
 ### Governor (Concurrency Cap)
 

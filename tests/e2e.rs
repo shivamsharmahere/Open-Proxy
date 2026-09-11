@@ -2405,18 +2405,22 @@ async fn streaming_deadline_stops_an_active_non_idle_stream() {
     assert!(started.elapsed() < Duration::from_secs(2));
 
     let metrics = metrics(&proxy).await;
-    for field in [
-        "prompt_tokens",
-        "completion_tokens",
-        "total_tokens",
-        "cached_tokens",
-        "reasoning_tokens",
+    // The deadline finalizes the no-usage observer once. The response-side
+    // fields stay unavailable (a partial stream is never estimated); prompt
+    // carries the request-side chars÷4 estimate, which is known at send time
+    // rather than observed from the broken stream.
+    for (field, result) in [
+        ("prompt_tokens", "estimated"),
+        ("completion_tokens", "unavailable"),
+        ("total_tokens", "unavailable"),
+        ("cached_tokens", "unavailable"),
+        ("reasoning_tokens", "unavailable"),
     ] {
         assert!(
             metrics.contains(&format!(
-                r#"nimproxy_usage_observations_total{{field="{field}",result="unavailable"}} 1"#
+                r#"nimproxy_usage_observations_total{{field="{field}",result="{result}"}} 1"#
             )),
-            "deadline must finalize the no-usage observer once: {metrics}"
+            "deadline must finalize {field} as {result} exactly once: {metrics}"
         );
     }
 }
@@ -2985,7 +2989,9 @@ async fn dashboard_observation_quality_is_honest() {
     )
     .await;
 
-    // Unavailable: a valid buffered response carries no usage object.
+    // Unavailable: a valid buffered response carries no usage object, so the
+    // response-side fields stay unavailable while prompt falls back to the
+    // request-side estimate.
     mock.state.push(Behavior::ExactResponse {
         content_type: "application/json".into(),
         body: r#"{"choices":[]}"#.into(),
@@ -2999,7 +3005,9 @@ async fn dashboard_observation_quality_is_honest() {
         .error_for_status()
         .unwrap();
 
-    // Estimated: one successful nonterminal SSE event has no measured usage.
+    // Estimated: one successful nonterminal SSE event has no measured usage —
+    // completion comes from the event count, prompt from the request-side
+    // estimate.
     mock.state.push(Behavior::ExactResponse {
         content_type: "text/event-stream".into(),
         body:
@@ -3072,7 +3080,9 @@ async fn dashboard_observation_quality_is_honest() {
     );
 
     // A nominal completed response with an unterminated final SSE event is
-    // still a truncated observation, not measured or estimated usage.
+    // still a truncated observation for the response-side fields — measured
+    // nor estimated usage except prompt, whose request-side estimate is known
+    // at send time and survives the unterminated event.
     mock.state.push(Behavior::ExactResponse {
         content_type: "text/event-stream".into(),
         body: "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":2}}"
@@ -3109,7 +3119,8 @@ async fn dashboard_observation_quality_is_honest() {
         usage_observation_counter_lines(&exposition),
         BTreeSet::from([
             r#"nimproxy_usage_observations_total{field="prompt_tokens",result="measured"} 2"#.to_owned(),
-            r#"nimproxy_usage_observations_total{field="prompt_tokens",result="unavailable"} 5"#.to_owned(),
+            r#"nimproxy_usage_observations_total{field="prompt_tokens",result="estimated"} 3"#.to_owned(),
+            r#"nimproxy_usage_observations_total{field="prompt_tokens",result="unavailable"} 2"#.to_owned(),
             r#"nimproxy_usage_observations_total{field="prompt_tokens",result="invalid"} 1"#.to_owned(),
             r#"nimproxy_usage_observations_total{field="completion_tokens",result="measured"} 2"#.to_owned(),
             r#"nimproxy_usage_observations_total{field="completion_tokens",result="estimated"} 1"#.to_owned(),
@@ -3208,6 +3219,63 @@ async fn dashboard_observation_quality_is_honest() {
                 .to_owned(),
         ]),
         "pre-observation retry responses do not add observation counters"
+    );
+}
+
+#[tokio::test]
+async fn stream_with_prompt_estimate_records_metrics() {
+    // Mutation caught: a completed stream whose usage omits prompt_tokens must
+    // backfill from the request-side chars÷4 estimate — surfaced as
+    // result="estimated" once and added to the prompt-token counter — while a
+    // measured prompt is never replaced by the estimate.
+    let mock = start_mock().await;
+    let proxy = start_proxy(&mock.url, &[]).await;
+
+    // Messages are "you are a test" (14) + " " + "12345678" (8): 23 chars ->
+    // a prompt estimate of 5 (floor(23/4)). Completion estimates from the one
+    // countable nonterminal delta event.
+    mock.state.push(Behavior::ExactResponse {
+        content_type: "text/event-stream".into(),
+        body: "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hi\"}}]}\n\ndata: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+            .into(),
+    });
+    read_sse(
+        client()
+            .post(proxy.url("/v1/chat/completions"))
+            .json(&chat_body("12345678", true))
+            .send()
+            .await
+            .unwrap(),
+    )
+    .await;
+
+    // Measured upstream prompt usage (11) is never overwritten by the
+    // request-side estimate.
+    read_sse(
+        client()
+            .post(proxy.url("/v1/chat/completions"))
+            .json(&chat_body("measured", true))
+            .send()
+            .await
+            .unwrap(),
+    )
+    .await;
+
+    let metrics = metrics(&proxy).await;
+    for line in [
+        r#"nimproxy_usage_observations_total{field="prompt_tokens",result="estimated"} 1"#,
+        r#"nimproxy_usage_observations_total{field="prompt_tokens",result="measured"} 1"#,
+        r#"nimproxy_usage_observations_total{field="completion_tokens",result="estimated"} 1"#,
+    ] {
+        assert!(metrics.contains(line), "missing {line}: {metrics}");
+    }
+    assert!(
+        metrics.contains(r#"nimproxy_prompt_tokens_total{client="local",model="mock/model-a"} 16"#),
+        "prompt counter carries estimate 5 plus measured 11, never replacing measured: {metrics}"
+    );
+    assert!(
+        metrics.contains(r#"nimproxy_completion_tokens_total{client="local",model="mock/model-a",source="estimate"} 1"#),
+        "completion estimate stays source-tagged alongside measured usage: {metrics}"
     );
 }
 

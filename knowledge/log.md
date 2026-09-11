@@ -6,6 +6,24 @@ description: Append-only record of ingests, decisions, and maintenance passes.
 
 # Log
 
+## [2026-09-11] decision — prompt-token chars÷4 heuristic estimate
+
+Providers that return no usage no longer leave prompt-token accounting empty:
+a finalized response without measured prompt usage estimates prompt tokens as
+request characters ÷ 4, clamped to ≥ 1, and marks the field
+`Observation::Estimated` — the same treatment the completed-stream event count
+already gets for completion. Estimates stay under the existing
+`source="estimate"` label value, and the frozen
+`nimproxy_usage_observations_total` {field, result} vocabulary is unchanged:
+the pair (`field="prompt_tokens"`, `result="estimated"`) was already inside
+its two closed sets, so the change is additive only. Recorded in the new
+[prompt-tokens heuristic decision](decisions/prompt-tokens-heuristic-estimate.md);
+[NIM observations](architecture/nim-observations.md) and the
+[usage-injection decision](decisions/usage-injection-auto-fallback.md) were
+updated to match, README and `docs/openproxy-docs.md` describe the fallback,
+and the v0.6.6 foundation plan's observation contract now permits `Estimated`
+for `PromptTokens` with a dated scope delta.
+
 ## [2026-09-04] feature — multi-upstream endpoint groups with model routing
 
 Proxy now fronts several OpenAI-compatible APIs (primary `nvidia` group plus

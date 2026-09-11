@@ -33,6 +33,10 @@ struct Ctx {
     model: String,
     path: String,
     started: Instant,
+    /// Deterministic request-side prompt-token estimate (chars/4), used only
+    /// when the provider never reports usage. Computed from the parsed body
+    /// before it is moved/consumed.
+    prompt_estimate: Option<u64>,
 }
 
 /// Cap on distinct `model` label values tracked, past which new models are
@@ -343,6 +347,39 @@ fn record_shape(ctx: &Ctx, parsed: Option<&serde_json::Value>, wants_stream: boo
     }
 }
 
+/// Deterministic prompt-token estimate from the request body's `messages` or
+/// `prompt` text. Chars/4 heuristic — not a real tokenizer; the same estimate
+/// is used regardless of provider (this is the contract). Returns None when
+/// no countable text exists (image-only requests, missing content, etc.).
+fn estimate_prompt_tokens(request: &serde_json::Value) -> Option<u64> {
+    let text: String = if let Some(messages) = request.get("messages").and_then(|v| v.as_array()) {
+        messages
+            .iter()
+            .filter_map(|m| {
+                m.get("content").and_then(|c| match c {
+                    serde_json::Value::String(s) => Some(s.clone()),
+                    serde_json::Value::Array(parts) => Some(
+                        parts
+                            .iter()
+                            .filter_map(|p| p.get("text").and_then(|t| t.as_str()))
+                            .collect::<Vec<_>>()
+                            .join(" "),
+                    ),
+                    _ => None,
+                })
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    } else {
+        request.get("prompt").and_then(|v| v.as_str())?.to_owned()
+    };
+    let chars = text.chars().count() as u64;
+    if chars == 0 {
+        return None;
+    }
+    Some(chars.max(4) / 4) // minimum 1 token
+}
+
 /// Record only finalized typed observations. Invalid and unavailable upstream
 /// values are deliberately absent from the existing metrics.
 fn record_observations(
@@ -359,6 +396,7 @@ fn record_observations(
     }
     let prompt = match observations.usage.prompt_tokens {
         Observation::Measured(value) => Some(value),
+        Observation::Estimated(value) => Some(value),
         _ => None,
     };
     let (completion, source) = match observations.usage.completion_tokens {
@@ -401,7 +439,11 @@ fn finalize_sse_observer(
     observer: &Arc<Mutex<Option<SseObserver>>>,
     outcome: StreamOutcome,
 ) -> Option<(u64, &'static str)> {
-    let observations = observer.lock().unwrap().take()?.finish(outcome);
+    let observations = observer
+        .lock()
+        .unwrap()
+        .take()?
+        .finish(outcome, ctx.prompt_estimate);
     record_observations(ctx, &observations)
 }
 
@@ -517,11 +559,12 @@ pub async fn handle(
         .as_ref()
         .and_then(|v| v.get("model").and_then(|m| m.as_str()))
         .unwrap_or("none");
-    let ctx = Ctx {
+    let mut ctx = Ctx {
         client,
         model: label_model(&state, raw_model),
         path: label_path(uri.path()),
         started: Instant::now(),
+        prompt_estimate: None,
     };
 
     // Model routing: which endpoint groups may serve this request. A
@@ -573,6 +616,10 @@ pub async fn handle(
     if ctx.path == "/v1/chat/completions" || ctx.path == "/v1/completions" {
         record_shape(&ctx, parsed.as_ref(), wants_stream);
     }
+
+    // Deterministic prompt-token fallback for providers that never report
+    // usage; must run before the stream_options injection path moves `parsed`.
+    ctx.prompt_estimate = parsed.as_ref().and_then(estimate_prompt_tokens);
 
     // Usage injection: streamed responses only report exact token usage when
     // asked via stream_options, so ask on the client's behalf. `fallback`
@@ -1171,7 +1218,7 @@ async fn relay(resp: reqwest::Response, ctx: &Ctx) -> Response {
         }
     };
     if status.is_success() {
-        record_observations(ctx, &observe_buffered(&body));
+        record_observations(ctx, &observe_buffered(&body, ctx.prompt_estimate));
     }
     Response::builder()
         .status(status)
@@ -1283,7 +1330,8 @@ fn gateway_timeout(cfg: &Config, pool_len: usize) -> Response {
 #[cfg(test)]
 mod tests {
     use super::{
-        bounded_label, count_tools, is_json_mode, label_path, sanitize_label, tool_choice_mode,
+        bounded_label, count_tools, estimate_prompt_tokens, is_json_mode, label_path,
+        sanitize_label, tool_choice_mode,
     };
     use std::collections::HashSet;
 
@@ -1369,6 +1417,69 @@ mod tests {
     }
 
     #[test]
+    fn estimate_prompt_tokens_chat_messages() {
+        // The chars÷4 heuristic floors (11 chars -> 2) with a minimum of 1
+        // for any non-empty text; the same estimate is provider-independent
+        // by contract.
+        assert_eq!(
+            estimate_prompt_tokens(
+                &serde_json::json!({"model": "m", "messages": [{"role": "user", "content": "hello world"}]})
+            ),
+            Some(2)
+        );
+        // Messages concatenate before estimating: "abcd" + " " + "efgh".
+        assert_eq!(
+            estimate_prompt_tokens(&serde_json::json!({
+                "messages": [
+                    {"role": "system", "content": "abcd"},
+                    {"role": "user", "content": "efgh"},
+                ]
+            })),
+            Some(2)
+        );
+        // Multimodal content contributes its text parts; non-text parts are
+        // skipped rather than fabricated into the count.
+        assert_eq!(
+            estimate_prompt_tokens(&serde_json::json!({
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "hello"},
+                        {"type": "image_url", "image_url": {"url": "https://example.invalid/x.png"}},
+                        {"type": "text", "text": "world"},
+                    ]
+                }]
+            })),
+            Some(2)
+        );
+        // Legacy completions `prompt` string works too.
+        assert_eq!(
+            estimate_prompt_tokens(&serde_json::json!({"prompt": "hello world"})),
+            Some(2)
+        );
+        // Any non-empty text estimates at least one token.
+        assert_eq!(
+            estimate_prompt_tokens(&serde_json::json!({"prompt": "hi"})),
+            Some(1)
+        );
+        // Nothing countable -> None: empty messages, empty or missing
+        // content, image-only content, empty prompt, unrelated payload, and
+        // non-object bodies.
+        for body in [
+            serde_json::json!({"messages": []}),
+            serde_json::json!({"messages": [{"role": "user", "content": ""}]}),
+            serde_json::json!({"messages": [{"role": "user", "content": null}]}),
+            serde_json::json!({"messages": [{"role": "user"}]}),
+            serde_json::json!({"messages": [{"role": "user", "content": [{"type": "image_url", "image_url": {"url": "u"}}]}]}),
+            serde_json::json!({"prompt": ""}),
+            serde_json::json!({"model": "m"}),
+            serde_json::json!("not an object"),
+        ] {
+            assert_eq!(estimate_prompt_tokens(&body), None, "{body}");
+        }
+    }
+
+    #[test]
     fn merge_catalogs_dedupes_by_id_first_group_wins() {
         use super::merge_catalogs;
         use bytes::Bytes;
@@ -1430,14 +1541,14 @@ pub mod fuzz {
     pub fn sse_scan(data: &[u8]) {
         let mut whole = crate::observation::SseObserver::default();
         whole.push(data);
-        let _ = whole.finish(crate::observation::StreamOutcome::Completed);
+        let _ = whole.finish(crate::observation::StreamOutcome::Completed, None);
 
         let step = data.first().map_or(3, |b| (*b as usize % 17) + 1);
         let mut frag = crate::observation::SseObserver::default();
         for chunk in data.chunks(step) {
             frag.push(chunk);
         }
-        let _ = frag.finish(crate::observation::StreamOutcome::Completed);
+        let _ = frag.finish(crate::observation::StreamOutcome::Completed, None);
     }
 
     /// The sanitizer's output invariants ARE the security property: bounded

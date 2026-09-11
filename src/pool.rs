@@ -205,7 +205,12 @@ impl Pool {
     /// can't reroute an in-flight reservation to another group's API.
     pub fn lane_endpoint(&self, lane: usize) -> (String, String, usize, bool) {
         let l = &self.lanes[lane];
-        (l.base_url.clone(), l.upstream.clone(), l.endpoint, l.supports_stream_options)
+        (
+            l.base_url.clone(),
+            l.upstream.clone(),
+            l.endpoint,
+            l.supports_stream_options,
+        )
     }
 
     /// Take a slot on lane `i` if it has capacity right now. Reserving

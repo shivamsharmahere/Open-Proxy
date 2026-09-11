@@ -3,7 +3,7 @@ type: Component
 title: NIM response observations
 description: Private bounded typed observations of buffered and SSE NIM responses without proxy relay interference.
 tags: [nim, observations, sse, metrics, privacy]
-timestamp: 2026-08-01T00:00:00Z
+timestamp: 2026-09-11T00:00:00Z
 ---
 
 # NIM response observations
@@ -31,6 +31,12 @@ The estimate is the count of parsed events with a nonempty valid indexed
 Malformed JSON/UTF-8, `[DONE]`, comments, errors, usage-only/empty-choice,
 terminal, invalid-terminal, disconnected, and truncated input do not estimate.
 
+Prompt tokens are estimated heuristically instead: a finalized response with
+no measured prompt usage estimates prompt tokens as the request's character
+count ÷ 4, clamped to a minimum of 1. An invalid prompt value stays invalid,
+and a request with no countable characters stays unavailable. Total, cached,
+and reasoning reject estimation entirely — they are measured or unavailable.
+
 Buffered choices sum `message.tool_calls` arrays. Streamed choices deduplicate
 `(choice_index, tool_call_index)` fragments. Known finish strings map to the
 bounded enum; unknown strings are `Other`. Malformed choice/tool shapes are
@@ -46,9 +52,11 @@ data immediately after classification. Over-bound, malformed, and invalid
 UTF-8 events are unobservable. No prompt, completion text, model identity, or
 raw event body is retained after classification.
 
-The proxy records only finalized measured prompt/reasoning/tool/finish values
-and measured or estimated completion using its existing metric names and
-labels. Invalid/unavailable values are omitted there. Total and cached have no
+The proxy records only finalized measured reasoning/tool/finish values and
+measured or estimated prompt and completion using its existing metric names
+and labels. Estimates are carried under the existing `source="estimate"`
+label value, so heuristic totals never blend with measured ones.
+Invalid/unavailable values are omitted there. Total and cached have no
 existing token metric.
 
 Every finalized response also emits exactly five
@@ -60,12 +68,15 @@ only classification-to-counter boundary, so it neither reparses response bytes
 nor repeats an SSE event. Its maximum cardinality is 20 series and it carries
 no request, model, client, provider, or upstream-content label. Successful
 buffered and completed streams use their final typed values. A stream deadline
-takes the bounded observer exactly once and preserves already-measured usage
-while leaving missing fields unavailable; it never estimates a partial stream.
-Disconnect, truncation, idle cutoff, and unterminated completed SSE all
-finalize five unavailable outcomes before the proxy preserves their existing
-request/error behavior. Rejected/retried responses and failed buffered body
+takes the bounded observer exactly once and preserves already-measured usage;
+it never estimates completion from a partial stream, while the request-side
+prompt estimate — known at send time, not observed from the stream — still
+applies. Disconnect, truncation, and idle cutoff finalize five unavailable
+outcomes; an unterminated completed SSE event leaves the response-side fields
+unavailable while the request-side prompt estimate still applies. In every
+case the proxy preserves its existing request/error behavior. Rejected/retried responses and failed buffered body
 reads have no final observed body and emit none. See the [streaming pipeline](streaming-pipeline.md),
 [metrics history](metrics-history.md), [usage injection decision](../decisions/usage-injection-auto-fallback.md),
+[prompt-token heuristic-estimate decision](../decisions/prompt-tokens-heuristic-estimate.md),
 [capture runbook](../ops/nim-response-capture.md), and
 [test strategy](../testing/test-strategy.md).
