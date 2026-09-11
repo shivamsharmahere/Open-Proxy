@@ -437,6 +437,9 @@
 html {
   position: relative; /* framer useScroll(target) dev-warning expects a non-static container */
   scroll-behavior: smooth;
+  /* kill horizontal panning on phones: without this, decorative blobs /
+     wide code lines widen the document and fixed elements (nav) pan off-screen */
+  overflow-x: clip;
 }
 section[id] {
   scroll-margin-top: 96px;

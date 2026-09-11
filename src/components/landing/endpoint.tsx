@@ -140,8 +140,8 @@ export function Endpoint() {
   return (
     <section id="endpoints" className="relative py-14 md:py-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_1fr] lg:gap-16">
-          <div>
+        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-[1.05fr_1fr] lg:gap-16">
+          <div className="min-w-0">
             <SectionHeading
               eyebrow="developer experience"
               title={
@@ -188,13 +188,13 @@ export function Endpoint() {
             </Reveal>
           </div>
 
-          <Reveal delay={0.12}>
+          <Reveal delay={0.12} className="min-w-0">
             <div className="flex flex-col gap-3">
               <div className="diffuse-card flex items-center gap-3 rounded-2xl px-5 py-4 font-mono text-[12px]">
                 <span className="rounded-md bg-stone-100 px-2 py-1 text-[9.5px] font-semibold uppercase tracking-wider text-stone-500">
                   env
                 </span>
-                <span className="text-stone-500">
+                <span className="min-w-0 break-all text-stone-500">
                   BASE_URL=<span className="text-emerald-700">http://localhost:8000/v1</span>
                 </span>
               </div>

@@ -533,7 +533,7 @@ export function DashboardSection() {
 
 export function PrivacyBand() {
   return (
-    <section className="relative border-y border-stone-900/[0.07] bg-stone-900 py-14 md:py-20">
+    <section className="relative overflow-hidden border-y border-stone-900/[0.07] bg-stone-900 py-14 md:py-20">
       <div
         aria-hidden
         className="absolute left-1/2 top-0 h-[300px] w-[600px] -translate-x-1/2 rounded-full bg-emerald-500/10 blur-[110px]"

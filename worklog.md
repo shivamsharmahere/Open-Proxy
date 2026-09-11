@@ -299,3 +299,32 @@ Verification:
 
 Stage Summary:
 - DONE. Full day/night theming with nav toggle (desktop + mobile, / and /docs), warm-charcoal night palette matching the dark CTA reference, no-FOUC load, persisted preference, View Transition cross-fade. Files: globals.css, theme-toggle.tsx (new), nav.tsx, layout.tsx, marquee.tsx, final.tsx.
+
+---
+Task ID: 13
+Agent: main (Super Z)
+Task: Full responsive audit + fix ("website is not responsive to screen size; on phone the hamburger icon and day/night toggle get out of screen")
+
+Work Log:
+- Root cause of the phone complaint: document had HORIZONTAL overflow (docW 555px at 390 viewport) -> on real phones the page pans sideways and position:fixed elements (nav with toggle + hamburger) pan WITH the layout viewport, sliding off-screen
+- Culprits found via getBoundingClientRect sweep at 390/360/320:
+  1. pool.tsx decorative blob (absolute 720px, centered) had NO overflow-hidden ancestor -> right edge 555 = docW
+  2. dashboard.tsx PrivacyBand blob (absolute 600px) no clip ancestor -> right 495
+  3. endpoint.tsx: <pre> code lines (367px unbreakable) gave the CodeBlock column min-content 409 -> implicit grid auto track sized to 409, BOTH columns overflowed the 358 container (grid item min-width:auto behavior)
+  4. quickstart.tsx steps used initial={{x:24}} -> transform extended scrollable overflow to 398 while off-screen
+  5. endpoint env card mono URL unbreakable at 320px relic width (+1.2px)
+- Fixes: endpoint grid -> grid-cols-1 + min-w-0 on both columns (pre now scrolls internally, was always the intent); env URL span -> min-w-0 break-all; pool.tsx + PrivacyBand sections -> overflow-hidden (glow visuals unchanged); quickstart steps x:24 -> y:24 (vertical matches the timeline metaphor, kills the horizontal-overflow class); globals.css html rule -> overflow-x: clip as a global safety net (no scroll container created, sticky/fixed unaffected; older browsers without clip support are still covered by the per-section fixes)
+- Marquee (2055px) + hero/final auroras verified already clipped before fixing
+
+Verification:
+- bun run lint: clean
+- docW == viewport at 390 (was 555), 360, 320 (390: 390, 360: 360, 320: 320 after break-all); /docs at 390: 390
+- Nav at 320/360/390: logo + theme toggle + hamburger all inside viewport (nav right 304 < 320 worst case)
+- Mobile menu opens, all links + CTA inside viewport (max right 381 at 390)
+- Dark mode at 390: toggle works, endpoints heading wraps correctly, pool cards intact, docW stays 390
+- Desktop 1440 regression: docW 1440, pool/privacy glows render identically (clipped at section bounds only), ScrollRail + watermark + final CTA intact
+- Screenshots kept: verify-mobile-menu.png, verify-mobile-endpoints-dark.png, verify-mobile-pool-dark.png, verify-desktop-pool.png, verify-desktop-privacy.png, verify-desktop-end.png
+- Console: only Fast Refresh logs; no page errors
+
+Stage Summary:
+- DONE. Site is now overflow-free from 320px to 1440px; fixed elements no longer pan off-screen on phones. Files: endpoint.tsx, pool.tsx, dashboard.tsx, quickstart.tsx, globals.css.

@@ -117,8 +117,8 @@ export function Quickstart() {
             {STEPS.map((s, i) => (
               <motion.div
                 key={s.title}
-                initial={{ opacity: 0, x: 24 }}
-                whileInView={{ opacity: 1, x: 0 }}
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-60px" }}
                 transition={{ delay: i * 0.1, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                 className="group relative flex gap-5 py-5 pl-1"
