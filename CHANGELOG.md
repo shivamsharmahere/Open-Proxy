@@ -52,15 +52,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `GET /v1/models/{id}` (per-model retrieve) is now answered from the
-  merged catalog cache instead of being forwarded to the catch-all group
-  with no model in the request body. A model carried only by a non-primary
-  group previously 404'd against the primary upstream even though the proxy
-  listed it in `/v1/models`; the retrieve now respects group ownership,
-  the global disabled toggle, and the request deadline, spends no rate
-  budget, and is labeled with the real model id under path `/v1/models`
-  (previously `model="none"`/`path="other"` in `nimproxy_requests_total`).
-  Ids containing `/` may arrive percent-encoded and are decoded.
 - Installed locale definitions now jointly drive locale bootstrap, public and
   operator catalog bytes, and route acceptance. Catalog URLs accept valid
   canonicalizable spellings such as `en-us`; `en-XA` remains test-only.
@@ -86,6 +77,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Contributor and knowledge documentation now match the split presentation
   layer, current locale/plural guards, and trusted-proxy boundary. The guide
   checker validates local links across maintained repository documentation.
+
+## [0.6.7] - 2026-09-13
+
+### Fixed
+
+- `GET /v1/models/{id}` (per-model retrieve) is now answered from the
+  merged catalog cache instead of being forwarded to the catch-all group
+  with no model in the request body. A model carried only by a non-primary
+  group previously 404'd against the primary upstream even though the proxy
+  listed it in `/v1/models`; the retrieve now respects group ownership,
+  the global disabled toggle, and the request deadline, spends no rate
+  budget, and is labeled with the real model id under path `/v1/models`
+  (previously `model="none"`/`path="other"` in `nimproxy_requests_total`).
+  Ids containing `/` may arrive percent-encoded and are decoded.
 
 ## [0.6.6] - 2026-08-01
 
@@ -730,7 +735,8 @@ Initial rate-limit-aware proxy.
 - **Distroless image**: a static musl binary shipped `FROM scratch` (~3.5 MB,
   TLS roots compiled in), running non-root with hardened compose defaults.
 
-[Unreleased]: https://github.com/shivamsharmahere/Open-Proxy/compare/v0.6.6...HEAD
+[Unreleased]: https://github.com/shivamsharmahere/Open-Proxy/compare/v0.6.7...HEAD
+[0.6.7]: https://github.com/shivamsharmahere/Open-Proxy/compare/v0.6.6...v0.6.7
 [0.6.6]: https://github.com/shivamsharmahere/Open-Proxy/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/shivamsharmahere/Open-Proxy/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/shivamsharmahere/Open-Proxy/compare/v0.6.3...v0.6.4

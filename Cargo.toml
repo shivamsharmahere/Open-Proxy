@@ -1,6 +1,6 @@
 [package]
 name = "open-proxy"
-version = "0.6.6"
+version = "0.6.7"
 edition = "2021"
 description = "Rate-limit-aware OpenAI-compatible multi-upstream proxy with model routing and multi-key load balancing"
 license = "MIT"
