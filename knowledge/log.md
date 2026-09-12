@@ -30,6 +30,24 @@ v0.6.7 on 2026-09-13 after the owner's 2026-09-12 rebuild was found to
 have packaged `main` (which predated the fix branch) — the running image
 reproduced the defect until the fix was merged and version-bumped.
 
+## [2026-09-12] ops — TokenRouter traffic bypassed the gateway via a direct client provider
+
+Reproduced the owner's report that a pinned TokenRouter model answered but
+never appeared on the dashboard: OpenCode carried a direct `tokenrouter`
+provider credential (plus a direct `nvidia` one) in its own auth store, so
+that traffic went straight to the upstream — the proxy's request log had no
+such model at all, and none of its pacing, lanes, or series applied. The
+proxy side was verified healthy end-to-end first: merged `/v1/models`
+(84 ids including `z-ai/glm-5.3-free`), non-streaming and streaming
+completions through the gateway with measured usage, and history
+checkpoints carrying all five keys (`key_rpms` 40×3 + 8×2). Fix applied
+client-side: the direct provider entries were removed (backup kept), leaving
+the single proxy-pointed provider. A stale second gateway (five-week-old
+image on port 9000) was also found absorbing shadow traffic; its removal is
+pending the owner's decision. Durable note in
+[multi-upstream](architecture/multi-upstream.md); `examples/opencode.json`
+model ids refreshed to the current merged catalog.
+
 ## [2026-09-11] decision — prompt-token chars÷4 heuristic estimate
 
 Providers that return no usage no longer leave prompt-token accounting empty:

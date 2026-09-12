@@ -51,3 +51,14 @@ empty `models`).
   the [governor](governor.md). No new metric labels (series contract holds);
   routing is a debug trace. The authenticated key probe takes an optional
   `upstream` instead of a caller URL (SSRF guard preserved).
+- **Client bypass is the silent failure mode.** Routing, pacing, and
+  dashboard series exist only for traffic that actually reaches the proxy. A
+  harness with its own provider catalog (OpenCode and similar) can hold a
+  *direct* credential for the same upstream and send that upstream's models
+  straight to the source: the model answers, but no `nimproxy_*` series, no
+  lane accounting, and no cooldown protection record it. Diagnosis: the
+  proxy's request log lacks the model while the client log names a
+  non-proxy provider id; the fix is client-side — one provider entry whose
+  baseURL is the proxy, and no direct credentials for fronted upstreams. A
+  stale second gateway on another port compounds this by absorbing traffic
+  into an outdated, dashboard-less instance.

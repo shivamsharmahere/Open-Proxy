@@ -106,7 +106,7 @@ Model IDs pass through verbatim — use any model ID your provider supports (or 
 }
 ```
 
-Set `options.timeout: false` so OpenCode waits through the proxy's rate-limit heartbeats instead of aborting. For a complete config tuned for **GLM-5.2** (context, compaction, sampling), copy [`examples/opencode.json`](examples/opencode.json) — see [`examples/README.md`](examples/README.md) for the rationale behind each setting.
+Set `options.timeout: false` so OpenCode waits through the proxy's rate-limit heartbeats instead of aborting. For a complete multi-group config (model limits, compaction), copy [`examples/opencode.json`](examples/opencode.json) — see [`examples/README.md`](examples/README.md) for the rationale behind each setting.
 
 **Codex CLI** — `~/.codex/config.toml`:
 

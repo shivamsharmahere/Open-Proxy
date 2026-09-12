@@ -3,29 +3,32 @@
   "provider": {
     "nim": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "NVIDIA NIM (via OPENPROXY)",
+      "name": "OPENPROXY (all upstream groups)",
       "options": {
         "baseURL": "http://localhost:8000/v1",
         "apiKey": "{env:NIM_PROXY_KEY}",
         "timeout": false
       },
       "models": {
-        "z-ai/glm-5.2": {
-          "name": "GLM-5.2 (NIM)",
+        "moonshotai/kimi-k3": {
+          "name": "Kimi K3 (NIM)",
           "limit": {
             "context": 131072,
             "output": 32768
-          },
-          "options": {
-            "temperature": 0.6,
-            "top_p": 0.95
+          }
+        },
+        "z-ai/glm-5.3-free": {
+          "name": "GLM-5.3 Free (TokenRouter)",
+          "limit": {
+            "context": 131072,
+            "output": 32768
           }
         }
       }
     }
   },
-  "model": "nim/z-ai/glm-5.2",
-  "small_model": "nim/z-ai/glm-5.2",
+  "model": "nim/moonshotai/kimi-k3",
+  "small_model": "nim/moonshotai/kimi-k3",
   "compaction": {
     "auto": true,
     "prune": true,

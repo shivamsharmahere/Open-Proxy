@@ -1,10 +1,12 @@
 # Example configs
 
-## `opencode.json` — GLM-5.2 via OPENPROXY
+## `opencode.json` — OpenCode through OPENPROXY
 
 A ready-to-use [OpenCode](https://opencode.ai) config pointed at a local
-OPENPROXY (`http://localhost:8000/v1`) and tuned for **GLM-5.2**, Z.ai's
-long-context agentic-coding model on the [NVIDIA NIM catalog](https://build.nvidia.com/z-ai).
+OPENPROXY (`http://localhost:8000/v1`). One provider entry serves **every
+upstream group** the proxy fronts: the example lists `moonshotai/kimi-k3`
+(NVIDIA NIM group) and `z-ai/glm-5.3-free` (an extra TokenRouter group), but
+any model in the proxy's merged catalog works under the same entry.
 
 ### Install
 
@@ -19,36 +21,39 @@ export NIM_PROXY_KEY=your-proxy-secret   # a client API key (npk_…) you minted
 opencode
 ```
 
-Confirm the model id your NIM account actually serves — the proxy is a strict
-pass-through, so the key under `models` must match NIM exactly:
+Confirm the model ids your groups actually serve — the proxy is a strict
+pass-through, so a key under `models` must match the upstream catalog
+exactly:
 
 ```sh
 curl -s localhost:8000/v1/models | grep -i glm
 ```
 
-If it returns a different id (e.g. `z-ai/glm-5.1`, or GLM-5.2 isn't on the
-hosted free API yet), change the `models` key and the `model` reference to match.
+If an id differs, change the `models` key and the `model` reference to match.
+Only give OpenCode credentials for the proxy itself: a direct credential for
+a fronted upstream (in OpenCode's auth store or a second provider entry)
+silently bypasses the gateway — those requests get no pacing and never show
+on the dashboard.
 
 ### Why these settings
 
 | Setting | Value | Rationale |
 |---|---|---|
-| `options.timeout` | `false` | **The important one.** OPENPROXY holds the connection open with SSE heartbeats while it waits out NIM's 40 RPM limit. With a client-side timeout, OpenCode would abort mid-wait and defeat the proxy's whole purpose. Disable it and let the proxy pace. |
-| `options.baseURL` | `http://localhost:8000/v1` | Points at the proxy, not NIM directly. Change the port if you set a non-default `PORT`. |
+| `options.timeout` | `false` | **The important one.** OPENPROXY holds the connection open with SSE heartbeats while it waits out a group's per-key RPM limit. With a client-side timeout, OpenCode would abort mid-wait and defeat the proxy's whole purpose. Disable it and let the proxy pace. |
+| `options.baseURL` | `http://localhost:8000/v1` | Points at the proxy, never at an upstream directly. Change the port if you set a non-default `PORT`. |
 | `options.apiKey` | `{env:NIM_PROXY_KEY}` | The SDK requires a key. In keyed mode this is a client API key (`npk_…`) you generate in the dashboard Settings; in open mode any non-empty value works. |
-| `limit.context` | `131072` (128k) | GLM-5.2's card advertises a 1M-token window, but NIM's **hosted** endpoint has historically served GLM at 128k. 128k is the safe floor and is plenty for agentic coding. Because OpenCode auto-compacts *below* this number, setting it conservatively means compaction fires before NIM can reject an over-length request. Raise it toward 1M only if testing confirms the hosted window is larger. |
-| `limit.output` | `32768` | OpenCode silently caps `limit.output` at 32k ([issue #29363](https://github.com/anomalyco/opencode/issues/29363)), so this is the effective ceiling. Generous headroom for GLM-5.2's reasoning/"thinking" tokens, which count toward output. |
-| `options.temperature` | `0.6` | Balanced for agentic coding — deterministic enough to follow tool schemas, loose enough to reason. Bump toward `1.0` (Z.ai's general-purpose default) for more exploratory work. |
-| `options.top_p` | `0.95` | Z.ai's recommended nucleus-sampling value for GLM. |
+| `limit.context` | `131072` (128k) | A conservative floor: NVIDIA's **hosted** endpoints have historically served NIM-group models at 128k regardless of the card's advertised window, and other groups' served windows are unverified. Because OpenCode auto-compacts *below* this number, setting it conservatively means compaction fires before an upstream can reject an over-length request. Raise it only if testing confirms the served window is larger. |
+| `limit.output` | `32768` | OpenCode silently caps `limit.output` at 32k ([issue #29363](https://github.com/anomalyco/opencode/issues/29363)), so this is the effective ceiling. Generous headroom for reasoning/"thinking" tokens, which count toward output. |
 | `compaction` | `auto`/`prune`/`reserved: 24000` | Auto-compact keeps long sessions under the window; `prune` drops stale tool outputs; `reserved` leaves ~24k tokens free so a compaction summary plus the next response never overflow. **Option names have changed across OpenCode releases** — if your version ignores this block, check `opencode.ai/docs/config`; the real lever is `limit.context` above, which every version honors. |
-| `small_model` | GLM-5.2 | Title/summary generation stays on the same provider so you don't need a second key. It's cheap; the proxy answers `/v1/models` from cache so it costs no rate budget. |
+| `small_model` | `moonshotai/kimi-k3` | Title/summary generation stays on the same provider so you don't need a second key. It's cheap; the proxy answers `/v1/models` from cache so it costs no rate budget. |
 
 ### Notes
 
-- **Rate budget**: one NIM key = 40 RPM. Long agentic runs on GLM-5.2 (which
-  emits many reasoning tokens) go faster with more keys added in the dashboard
-  Settings — the proxy load-balances across them. Watch utilization on the
-  dashboard.
-- **Thinking effort**: GLM-5.2 supports variable thinking effort. This example
-  omits a `reasoning_effort` parameter because NIM may reject unknown fields
-  with a 400; add it only after confirming your NIM endpoint accepts it.
+- **Rate budget is per key, per group**: one NIM key = 40 RPM, and extra
+  groups carry their own per-key limits (the TokenRouter keys in this setup
+  are set to 8 RPM). Long agentic runs go faster with more keys added in the dashboard
+  Settings — the proxy load-balances within a group and never exceeds a
+  key's limit. Watch utilization on the dashboard.
+- **Unknown fields**: this example omits parameters like
+  `reasoning_effort` because an upstream may reject unknown fields with a
+  400; add them only after confirming the serving group accepts them.
