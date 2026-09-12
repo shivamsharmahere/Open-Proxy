@@ -36,7 +36,10 @@ empty `models`).
   group that has a key, merges by model id (first group wins), and removes
   disabled models. A single group's catalog still passes through
   byte-identical. Disabled-group lanes and keyless groups never burn a queue
-  wait (`active_endpoints`).
+  wait (`active_endpoints`). `GET /v1/models/{id}` is answered from that
+  same merged catalog (id percent-decoded when the harness encodes the `/`),
+  so a retrieve respects group ownership instead of being forwarded to the
+  catch-all group and 404ing against the wrong upstream.
 - **Operator surface.** `POST /api/settings/upstreams` (add/remove/set;
   the primary can be toggled and repinned but never removed) and
   `POST /api/settings/models` (full-replacement disabled list) are

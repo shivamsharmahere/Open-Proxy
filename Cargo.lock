@@ -853,6 +853,7 @@ dependencies = [
  "hmac",
  "metrics",
  "metrics-exporter-prometheus",
+ "percent-encoding",
  "reqwest",
  "serde",
  "serde_json",

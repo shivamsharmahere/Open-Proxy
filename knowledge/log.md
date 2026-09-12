@@ -6,6 +6,27 @@ description: Append-only record of ingests, decisions, and maintenance passes.
 
 # Log
 
+## [2026-09-12] fix — per-model retrieve answered from the merged catalog
+
+`GET /v1/models/{id}` fell through the generic `/v1` forwarder: the handler
+reads the model only from the request body, and a GET has none, so the
+request was routed as model `none`, labeled `model="none"`/`path="other"`
+in `nimproxy_requests_total`, and forwarded to the catch-all primary group —
+where a model pinned to another group 404'd against the wrong upstream even
+though the proxy's own `/v1/models` listed it (reproduced live: Hermes
+probes for `z-ai/glm-5.3-free` were answered by NIM's "Model does not
+exist"). The retrieve is now intercepted before routing: served from the
+merged catalog cache (percent-encoded ids decoded), respecting group
+ownership, the global disabled toggle, and the request deadline, spending no
+rate budget; `label_path` buckets it under `/v1/models` and the model label
+carries the real id. Failure path proven red→green by the new e2e test
+(`per_model_retrieve_is_served_from_the_merged_catalog_not_forwarded`) plus
+two unit tests; full suite 235 lib + 126 e2e + 8 openapi green; clippy
+`--all-targets` and `fmt --check` clean. The `{id}`-carrying metric labels
+move off the frozen `none`/`other` pair — recorded as a label-value
+correction in the CHANGELOG `Unreleased/Fixed` note; catalog behavior
+noted in [multi-upstream](architecture/multi-upstream.md).
+
 ## [2026-09-11] decision — prompt-token chars÷4 heuristic estimate
 
 Providers that return no usage no longer leave prompt-token accounting empty:

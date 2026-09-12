@@ -8876,6 +8876,100 @@ async fn multi_upstream_unknown_model_is_a_404_without_spending_budget() {
 }
 
 #[tokio::test]
+async fn per_model_retrieve_is_served_from_the_merged_catalog_not_forwarded() {
+    let primary = start_mock().await;
+    let second = start_mock().await;
+    // The second group's upstream carries a model the primary doesn't —
+    // the flagship scenario the forwarded probe used to 404 against NIM.
+    second
+        .state
+        .catalog_extra
+        .lock()
+        .unwrap()
+        .push("special/model".into());
+    let proxy = start_proxy_with(
+        &primary.url,
+        StoreOpts {
+            extra_upstreams: vec![extra_group(&second, &["special/model"])],
+            ..Default::default()
+        },
+        &[],
+    )
+    .await;
+
+    // Warm the merged catalog once; both groups fan out a single fetch each.
+    let warm = client().get(proxy.url("/v1/models")).send().await.unwrap();
+    assert_eq!(warm.status(), 200);
+    let primary_models = primary.state.models_hits.load(Ordering::SeqCst);
+    let second_models = second.state.models_hits.load(Ordering::SeqCst);
+
+    // A cataloged model retrieves by id from the cache: same object, no
+    // upstream contact, no rate budget.
+    let resp = client()
+        .get(proxy.url("/v1/models/mock/model-a"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(body["id"], "mock/model-a");
+    assert_eq!(body["object"], "model");
+    assert_eq!(
+        primary.state.models_hits.load(Ordering::SeqCst),
+        primary_models
+    );
+    assert_eq!(
+        second.state.models_hits.load(Ordering::SeqCst),
+        second_models
+    );
+
+    // A model absent from every group's catalog is a proxy 404, not a
+    // forwarded probe against the catch-all group.
+    let resp = client()
+        .get(proxy.url("/v1/models/absent/model"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 404);
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(body["error"]["code"], "model_not_found");
+
+    // A model listed only by the second group's upstream retrieves 200 from
+    // the merged catalog — pre-fix this was forwarded to the primary and
+    // rejected by the wrong upstream.
+    let resp = client()
+        .get(proxy.url("/v1/models/special/model"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(body["id"], "special/model");
+
+    // The retrieve is labeled with the real model id under /v1/models, not
+    // the pre-fix model="none"/path="other" pair.
+    let metrics = metrics(&proxy).await;
+    assert!(metrics.contains(
+        r#"nimproxy_requests_total{client="local",model="special/model",path="/v1/models",status="200"}"#
+    ));
+    assert!(!metrics.contains(r#"path="other"}"#));
+
+    // Percent-encoded ids decode to the same catalog entry.
+    let resp = client()
+        .get(proxy.url("/v1/models/mock%2Fmodel-a"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(body["id"], "mock/model-a");
+
+    // None of this spends generation budget on any group.
+    assert_eq!(primary.state.hit_count(), 0);
+    assert_eq!(second.state.hit_count(), 0);
+}
+
+#[tokio::test]
 async fn multi_upstream_disabled_model_is_rejected_and_hidden() {
     let mock = start_mock().await;
     let proxy = start_proxy_with(

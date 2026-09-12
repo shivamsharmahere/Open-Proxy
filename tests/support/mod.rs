@@ -64,6 +64,10 @@ pub struct MockState {
     pub script: Mutex<VecDeque<Behavior>>,
     pub models_hits: AtomicUsize,
     pub models_delay_ms: AtomicU64,
+    /// Optional catalog override for `GET /v1/models`: when set, these ids
+    /// (plus `mock/model-a`) form the served catalog. Tests use this to
+    /// simulate an upstream that carries models another group doesn't.
+    pub catalog_extra: Mutex<Vec<String>>,
 }
 
 impl MockState {
@@ -112,9 +116,16 @@ async fn mock_models(State(state): State<Arc<MockState>>) -> Response {
     if delay > 0 {
         tokio::time::sleep(Duration::from_millis(delay)).await;
     }
+    let extra = state.catalog_extra.lock().unwrap().clone();
+    let mut data = vec![
+        serde_json::json!({"id": "mock/model-a", "object": "model", "created": 0, "owned_by": "mock"}),
+    ];
+    data.extend(extra.iter().map(
+        |id| serde_json::json!({"id": id, "object": "model", "created": 0, "owned_by": "mock"}),
+    ));
     axum::Json(serde_json::json!({
         "object": "list",
-        "data": [{"id": "mock/model-a", "object": "model", "created": 0, "owned_by": "mock"}]
+        "data": data
     }))
     .into_response()
 }

@@ -52,6 +52,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `GET /v1/models/{id}` (per-model retrieve) is now answered from the
+  merged catalog cache instead of being forwarded to the catch-all group
+  with no model in the request body. A model carried only by a non-primary
+  group previously 404'd against the primary upstream even though the proxy
+  listed it in `/v1/models`; the retrieve now respects group ownership,
+  the global disabled toggle, and the request deadline, spends no rate
+  budget, and is labeled with the real model id under path `/v1/models`
+  (previously `model="none"`/`path="other"` in `nimproxy_requests_total`).
+  Ids containing `/` may arrive percent-encoded and are decoded.
 - Installed locale definitions now jointly drive locale bootstrap, public and
   operator catalog bytes, and route acceptance. Catalog URLs accept valid
   canonicalizable spellings such as `en-us`; `en-XA` remains test-only.

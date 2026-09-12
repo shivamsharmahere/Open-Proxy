@@ -114,7 +114,8 @@ fn bounded_label(seen: &mut std::collections::HashSet<String>, s: String, cap: u
 }
 
 /// Bound the `path` label to the known OpenAI endpoints; anything else
-/// (arbitrary sub-paths a client can hit under /v1/) becomes "other".
+/// (arbitrary sub-paths a client can hit under /v1/) becomes "other". A
+/// per-model retrieve is the models endpoint carrying the id in the URL.
 fn label_path(path: &str) -> String {
     match path {
         "/v1/chat/completions"
@@ -122,8 +123,29 @@ fn label_path(path: &str) -> String {
         | "/v1/embeddings"
         | "/v1/models"
         | "/v1/rankings" => path.to_owned(),
-        _ => "other".to_owned(),
+        _ => {
+            if per_model_path_id(path).is_some() {
+                "/v1/models".to_owned()
+            } else {
+                "other".to_owned()
+            }
+        }
     }
+}
+
+/// The model id embedded in a per-model retrieve path
+/// (`GET /v1/models/{id}`), percent-decoded; `None` for any other path.
+/// Model ids contain `/`, so the capture may span several segments.
+fn per_model_path_id(path: &str) -> Option<String> {
+    let raw = path.strip_prefix("/v1/models/")?;
+    if raw.is_empty() {
+        return None;
+    }
+    Some(
+        percent_encoding::percent_decode_str(raw)
+            .decode_utf8_lossy()
+            .into_owned(),
+    )
 }
 
 /// Statuses worth waiting out: rate limit and transient server-side trouble.
@@ -555,13 +577,17 @@ pub async fn handle(
         .unwrap_or_else(|| uri.path().to_owned());
 
     let mut parsed = serde_json::from_slice::<serde_json::Value>(&body).ok();
+    // Generation requests carry the model in the body; a per-model retrieve
+    // carries it in the URL path. Body wins when both exist.
     let raw_model = parsed
         .as_ref()
         .and_then(|v| v.get("model").and_then(|m| m.as_str()))
-        .unwrap_or("none");
+        .map(str::to_owned)
+        .or_else(|| per_model_path_id(uri.path()))
+        .unwrap_or_else(|| "none".to_owned());
     let mut ctx = Ctx {
         client,
-        model: label_model(&state, raw_model),
+        model: label_model(&state, &raw_model),
         path: label_path(uri.path()),
         started: Instant::now(),
         prompt_estimate: None,
@@ -571,14 +597,14 @@ pub async fn handle(
     // toggled-off model is rejected before queueing (no rate budget spent);
     // a model no enabled group carries is a 404, not a wait-until-timeout.
     // Routing uses the raw id — the metric label may collapse to "other".
-    let allowed = match cfg.route_model(raw_model) {
+    let allowed = match cfg.route_model(&raw_model) {
         None => {
             record_request(&ctx, "404");
-            return model_disabled(raw_model);
+            return model_disabled(&raw_model);
         }
         Some(v) if v.is_empty() => {
             record_request(&ctx, "404");
-            return model_not_found(raw_model);
+            return model_not_found(&raw_model);
         }
         Some(v) => v,
     };
@@ -602,6 +628,34 @@ pub async fn handle(
         let resp = models(state, cfg).await;
         record_request(&ctx, resp.status().as_str());
         return resp;
+    }
+
+    // Per-model retrieve: answer from the merged catalog so the probe
+    // respects group ownership and the disabled toggle instead of being
+    // forwarded to the catch-all group, and costs no rate budget.
+    if method == Method::GET {
+        if let Some(id) = per_model_path_id(uri.path()) {
+            if let Some(deadline) = request_deadline {
+                return match tokio::time::timeout_at(
+                    deadline.0.into(),
+                    model_by_id(state, cfg, &id),
+                )
+                .await
+                {
+                    Ok(resp) => {
+                        record_request(&ctx, resp.status().as_str());
+                        resp
+                    }
+                    Err(_) => {
+                        record_deadline(&ctx);
+                        deadline_exceeded()
+                    }
+                };
+            }
+            let resp = model_by_id(state, cfg, &id).await;
+            record_request(&ctx, resp.status().as_str());
+            return resp;
+        }
     }
 
     let wants_stream = parsed
@@ -1072,10 +1126,49 @@ fn streaming(
 /// toggled-off models removed. A single group's catalog still passes through
 /// byte-identical, preserving the historical contract.
 async fn models(state: Arc<AppState>, cfg: Arc<Config>) -> Response {
+    match catalog_body(state, cfg).await {
+        Ok(body) => json_response(StatusCode::OK, body),
+        Err(resp) => *resp,
+    }
+}
+
+/// `GET /v1/models/{id}`: one entry of the merged catalog, or 404 when no
+/// enabled group's catalog carries it (globally disabled models are already
+/// removed by the merge). Never forwarded upstream: the probe reflects what
+/// the proxy's own `/v1/models` lists, so per-group ownership holds.
+async fn model_by_id(state: Arc<AppState>, cfg: Arc<Config>, id: &str) -> Response {
+    let body = match catalog_body(state, cfg).await {
+        Ok(body) => body,
+        Err(resp) => return *resp,
+    };
+    let entry = serde_json::from_slice::<serde_json::Value>(&body)
+        .ok()
+        .and_then(|v| {
+            v.get("data")
+                .and_then(|d| d.as_array())
+                .and_then(|arr| {
+                    arr.iter()
+                        .find(|m| m.get("id").and_then(|i| i.as_str()) == Some(id))
+                })
+                .cloned()
+        });
+    match entry {
+        Some(entry) => json_response(
+            StatusCode::OK,
+            Bytes::from(serde_json::to_vec(&entry).expect("serialize catalog entry")),
+        ),
+        None => model_not_found(id),
+    }
+}
+
+/// The merged catalog body, served from cache when fresh, else one
+/// rate-slot fan-out per enabled group. Upstream-facing failures return
+/// the error response to relay.
+async fn catalog_body(state: Arc<AppState>, cfg: Arc<Config>) -> Result<Bytes, Box<Response>> {
     let mut cache = state.models_cache.lock().await;
     if let Some((at, body)) = cache.as_ref() {
         if at.elapsed() < cfg.models_ttl {
-            return json_response(StatusCode::OK, body.clone());
+            return Ok(body.clone());
         }
     }
     let live = state.pool().active_endpoints();
@@ -1087,7 +1180,7 @@ async fn models(state: Arc<AppState>, cfg: Arc<Config>) -> Response {
         .map(|(i, _)| i)
         .collect();
     if targets.is_empty() {
-        return gateway_timeout(&cfg, state.pool().len());
+        return Err(Box::new(gateway_timeout(&cfg, state.pool().len())));
     }
     let deadline = Instant::now() + Duration::from_secs(30);
     let mut hits: Vec<Bytes> = Vec::new();
@@ -1129,7 +1222,9 @@ async fn models(state: Arc<AppState>, cfg: Arc<Config>) -> Response {
         }
     }
     if hits.is_empty() {
-        return error.unwrap_or_else(|| gateway_timeout(&cfg, state.pool().len()));
+        return Err(Box::new(
+            error.unwrap_or_else(|| gateway_timeout(&cfg, state.pool().len())),
+        ));
     }
     let body = if hits.len() == 1 && cfg.disabled_models.is_empty() {
         hits.pop().unwrap()
@@ -1137,7 +1232,7 @@ async fn models(state: Arc<AppState>, cfg: Arc<Config>) -> Response {
         merge_catalogs(&hits, &cfg.disabled_models)
     };
     *cache = Some((Instant::now(), body.clone()));
-    json_response(StatusCode::OK, body)
+    Ok(body)
 }
 
 /// Merge per-group model catalogs into one OpenAI list: entries keyed by
@@ -1331,7 +1426,7 @@ fn gateway_timeout(cfg: &Config, pool_len: usize) -> Response {
 mod tests {
     use super::{
         bounded_label, count_tools, estimate_prompt_tokens, is_json_mode, label_path,
-        sanitize_label, tool_choice_mode,
+        per_model_path_id, sanitize_label, tool_choice_mode,
     };
     use std::collections::HashSet;
 
@@ -1373,6 +1468,28 @@ mod tests {
         assert_eq!(label_path("/v1/embeddings"), "/v1/embeddings");
         assert_eq!(label_path("/v1/anything-else"), "other");
         assert_eq!(label_path("/v1/../etc"), "other");
+    }
+
+    #[test]
+    fn path_label_buckets_per_model_retrieve_under_models() {
+        assert_eq!(label_path("/v1/models"), "/v1/models");
+        assert_eq!(label_path("/v1/models/mock/model-a"), "/v1/models");
+        assert_eq!(label_path("/v1/models/mock%2Fmodel-a"), "/v1/models");
+        assert_eq!(label_path("/v1/models-x"), "other");
+    }
+
+    #[test]
+    fn per_model_path_id_parses_and_percent_decodes() {
+        assert_eq!(per_model_path_id("/v1/models"), None);
+        assert_eq!(per_model_path_id("/v1/models/"), None);
+        assert_eq!(
+            per_model_path_id("/v1/models/mock/model-a"),
+            Some("mock/model-a".to_owned())
+        );
+        assert_eq!(
+            per_model_path_id("/v1/models/z-ai%2Fglm-5.3-free"),
+            Some("z-ai/glm-5.3-free".to_owned())
+        );
     }
 
     #[test]
