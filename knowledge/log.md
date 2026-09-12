@@ -24,7 +24,7 @@ carries the real id. Failure path proven red→green by the new e2e test
 two unit tests; full suite 235 lib + 126 e2e + 8 openapi green; clippy
 `--all-targets` and `fmt --check` clean. The `{id}`-carrying metric labels
 move off the frozen `none`/`other` pair — recorded as a label-value
-correction in the CHANGELOG `Unreleased/Fixed` note; catalog behavior
+correction in the CHANGELOG `[0.6.7]/Fixed` note; catalog behavior
 noted in [multi-upstream](architecture/multi-upstream.md). Released as
 v0.6.7 on 2026-09-13 after the owner's 2026-09-12 rebuild was found to
 have packaged `main` (which predated the fix branch) — the running image
