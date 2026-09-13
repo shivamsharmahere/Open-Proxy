@@ -1,8 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/logo.png" alt="open-proxy" width="140">
-
-# open-proxy
+<img src="docs/assets/logo.png" alt="open-proxy" width="300">
 
 **A tiny, multi-provider, rate-limit-aware OpenAI-compatible proxy. One proxy, every provider, zero 429s.**
 Add API keys from NVIDIA NIM, OpenRouter, TokenRouter, OpenAI, or any OpenAI-compatible API — open-proxy merges them into a single pool, obeys every upstream's speed limit, and keeps your clients running.
