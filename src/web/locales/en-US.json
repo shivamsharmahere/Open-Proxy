@@ -1942,18 +1942,14 @@
       "desc": "Input placeholder. 'e.g.' needs the locale's own abbreviation; 'admin' is a suggested value.",
       "hash": "d415d634"
     },
+    "setup.step2.add_group": {
+      "en": "Add another provider",
+      "desc": "Button label to add a new provider group in the setup wizard.",
+      "hash": "91f9cd40"
+    },
     "setup.step2.addkey": {
       "en": "Validate & add",
       "hash": "15414785"
-    },
-    "setup.step2.advanced": {
-      "en": "Advanced — upstream base URL",
-      "hash": "8dd07757"
-    },
-    "setup.step2.base_url": {
-      "en": "Upstream base URL",
-      "desc": "Accessible name for the optional setup upstream URL input.",
-      "hash": "a3b55051"
     },
     "setup.step2.error.key_duplicate": {
       "en": "That key is already added.",
@@ -1975,55 +1971,30 @@
       "desc": "The browser could not reach the proxy to validate the key. {error} is the browser's error text, inserted verbatim and never translated.",
       "hash": "9e7beddf"
     },
+    "setup.step2.group_base_url": {
+      "en": "Upstream base URL",
+      "desc": "Label for the per-group upstream base URL input.",
+      "hash": "a3b55051"
+    },
+    "setup.step2.group_hint": {
+      "en": "For multiple providers, enable JavaScript.",
+      "desc": "Noscript-only hint below the setup wizard step 2.",
+      "hash": "5df17d33"
+    },
     "setup.step2.hint": {
       "en": "API keys are shared across clients. The default rate limit is 40 requests/min per key.",
       "desc": "Explains pool sharing and the default per-key rate limit.",
       "hash": "897d7ac3"
-    },
-    "setup.step2.key_label": {
-      "en": "API key",
-      "desc": "Accessible name for the setup API key input.",
-      "hash": "16f0ee47"
     },
     "setup.step2.key_meta": {
       "en": "{models} models · {rpm} rpm",
       "desc": "Meta line on an added key: how many models the key reached, then its per-minute limit. 'rpm' is a unit and must survive verbatim.",
       "hash": "026c787c"
     },
-    "setup.step2.rpm_label": {
-      "en": "Requests per minute",
-      "desc": "Accessible name for the setup API key rate-limit input.",
-      "hash": "aa6d477f"
-    },
     "setup.step2.validating": {
       "en": "Validating…",
       "desc": "Button label while a key is probed upstream.",
       "hash": "cd51f8c8"
-    },
-    "setup.step2.add_group": {
-      "en": "Add another provider",
-      "desc": "Button label to add a new provider group in the setup wizard.",
-      "hash": "a1b2c3d4"
-    },
-    "setup.step2.group_base_url": {
-      "en": "Upstream base URL",
-      "desc": "Label for the per-group upstream base URL input.",
-      "hash": "b2c3d4e5"
-    },
-    "setup.step2.group_hint": {
-      "en": "For multiple providers, enable JavaScript.",
-      "desc": "Noscript-only hint below the setup wizard step 2.",
-      "hash": "c3d4e5f6"
-    },
-    "setup.step3.review.group": {
-      "en": "{name}",
-      "desc": "Review-panel row label for a provider group. {name} is the group name.",
-      "hash": "d4e5f6a7"
-    },
-    "setup.step3.review.groups_summary": {
-      "en": "{count} providers · {keys} keys total",
-      "desc": "Review-panel summary row showing total groups and keys. Keep the middle dot.",
-      "hash": "e5f6a7b8"
     },
     "setup.step3.api_access_keyed": {
       "en": "API key required · first client key \"default\"",
@@ -2064,6 +2035,16 @@
       "desc": "Review-panel row label. Whether the proxy's own /v1 endpoint will require a client API key.",
       "hash": "923fd434"
     },
+    "setup.step3.review.group": {
+      "en": "{name}",
+      "desc": "Review-panel row label for a provider group. {name} is the group name.",
+      "hash": "5e291d7b"
+    },
+    "setup.step3.review.groups_summary": {
+      "en": "{count} providers · {keys} keys total",
+      "desc": "Review-panel summary row showing total groups and keys. Keep the middle dot.",
+      "hash": "ee2cbb8c"
+    },
     "setup.step3.review.keys": {
       "en": "API keys",
       "desc": "Review-panel row label: the upstream API keys added in step 2.",
@@ -2078,11 +2059,6 @@
       "en": "Superuser",
       "desc": "Review-panel row label. The role of the account being created; the proxy persists this same role name.",
       "hash": "593b0a98"
-    },
-    "setup.step3.review.upstream": {
-      "en": "Upstream",
-      "desc": "Review-panel row label. The upstream base URL requests are forwarded to; the value beside it is a URL.",
-      "hash": "94adc696"
     },
     "setup.step4.apikey": {
       "en": "Client API key",

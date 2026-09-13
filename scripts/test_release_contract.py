@@ -22,11 +22,11 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertNotIn("--output-certificate", self.workflow)
 
     def test_release_publishes_and_verifies_bundles(self) -> None:
-        self.assertIn("nim-proxy-*.tar.gz.sigstore.json", self.workflow)
-        self.assertIn("nim-proxy-sbom.spdx.json.sigstore.json", self.workflow)
+        self.assertIn("open-proxy-*.tar.gz.sigstore.json", self.workflow)
+        self.assertIn("open-proxy-sbom.spdx.json.sigstore.json", self.workflow)
         self.assertIn(
             "printf '  --bundle "
-            "nim-proxy-%s-linux-amd64.tar.gz.sigstore.json",
+            "open-proxy-%s-linux-amd64.tar.gz.sigstore.json",
             self.workflow,
         )
 

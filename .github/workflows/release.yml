@@ -35,9 +35,6 @@ concurrency:
   group: release
   cancel-in-progress: false
 
-env:
-  IMAGE: ghcr.io/${{ github.repository }}
-
 jobs:
   prepare:
     name: resolve version (mint tag on dispatch)
@@ -48,6 +45,7 @@ jobs:
       version: ${{ steps.resolve.outputs.version }}
       minor: ${{ steps.resolve.outputs.minor }}
       tag: ${{ steps.resolve.outputs.tag }}
+      image: ${{ steps.resolve.outputs.image }}
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
@@ -91,6 +89,9 @@ jobs:
             echo "version=$version"
             echo "minor=${version%.*}"
             echo "tag=v$version"
+            # GHCR rejects references containing uppercase; the repository
+            # here is "Open-Proxy", so every image ref must be lowercased.
+            echo "image=ghcr.io/${GITHUB_REPOSITORY,,}"
           } >> "$GITHUB_OUTPUT"
 
   build:
@@ -110,6 +111,8 @@ jobs:
     permissions:
       contents: read
       packages: write # push per-arch image by digest
+    env:
+      IMAGE: ${{ needs.prepare.outputs.image }}
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
@@ -188,6 +191,8 @@ jobs:
       packages: write # push the tagged multi-arch manifest
       id-token: write # keyless cosign + provenance via OIDC
       attestations: write
+    env:
+      IMAGE: ${{ needs.prepare.outputs.image }}
     outputs:
       digest: ${{ steps.manifest.outputs.digest }}
     steps:
@@ -262,6 +267,8 @@ jobs:
     permissions:
       contents: write # create the release
       id-token: write # keyless cosign sign-blob over the downloadable assets
+    env:
+      IMAGE: ${{ needs.prepare.outputs.image }}
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
@@ -302,11 +309,11 @@ jobs:
           {
             printf '%s\n\n' 'Container image (multi-arch, signed, with SBOM + provenance):'
             printf '%s\n' '```sh'
-            printf 'docker pull ghcr.io/%s:%s\n' "$REPOSITORY" "$RELEASE_VERSION"
+            printf 'docker pull %s:%s\n' "$IMAGE" "$RELEASE_VERSION"
             printf '%s\n\n' '```'
             printf '%s\n\n' 'Verify the image signature:'
             printf '%s\n' '```sh'
-            printf 'cosign verify ghcr.io/%s:%s \\\n' "$REPOSITORY" "$RELEASE_VERSION"
+            printf 'cosign verify %s:%s \\\n' "$IMAGE" "$RELEASE_VERSION"
             printf "  --certificate-identity-regexp 'https://github.com/%s/.github/workflows/release.yml@.*' \\\\\n" "$REPOSITORY"
             printf '%s\n' '  --certificate-oidc-issuer https://token.actions.githubusercontent.com'
             printf '%s\n\n' '```'
