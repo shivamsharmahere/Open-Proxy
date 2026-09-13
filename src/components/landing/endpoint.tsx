@@ -25,17 +25,16 @@ const SNIPPETS: Record<string, { lang: string; code: string }> = {
     code: `{
   "$schema": "https://opencode.ai/config.json",
   "provider": {
-    "nim": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "OpenProxy (proxied)",
-      "options": {
-        "baseURL": "http://localhost:8000/v1",
-        "apiKey": "npk_your-key-here",
-        "timeout": false
+    "openproxy": {
+      "package": "@opencode-ai/ai/providers/openai-compatible",
+      "name": "OpenProxy",
+      "env": ["OPENAI_API_KEY"],
+      "settings": {
+        "baseURL": "http://localhost:8000/v1"
       }
     }
   }
-}`,
+}`, 
   },
   codex: {
     lang: "config.toml",

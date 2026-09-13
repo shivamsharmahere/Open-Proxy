@@ -8,7 +8,7 @@ import { SectionHeading, Reveal } from "./reveal";
 const DOCKER_CMD = `docker run -d --name open-proxy \\
   -p 127.0.0.1:8000:8000 \\
   -v open-proxy-data:/data \\
-  open-proxy`;
+  ghcr.io/shivamsharmahere/open-proxy:latest`;
 
 const STEPS = [
   {
@@ -59,9 +59,9 @@ export function Quickstart() {
           sub="No sign-up, no control plane, no vendor. The proxy runs on your machine, your VPS or your PaaS — and the first-run wizard does the rest."
         />
 
-        <div className="mt-10 grid items-start gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:gap-14">
+        <div className="mt-10 grid grid-cols-1 items-start gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:gap-14">
           {/* terminal */}
-          <Reveal>
+          <Reveal className="min-w-0">
             <div className="lg:sticky lg:top-28">
               <div className="overflow-hidden rounded-2xl border border-stone-900/10 bg-[#0c0a09] shadow-[0_36px_72px_-32px_oklch(0.216_0.008_90/0.45)]">
                 <div className="flex items-center gap-1.5 border-b border-white/[0.07] px-4 py-3">
@@ -83,7 +83,7 @@ export function Quickstart() {
                     )}
                   </button>
                 </div>
-                <div className="p-5 font-mono text-[12.5px] leading-relaxed">
+                <div className="nice-scroll overflow-x-auto p-5 font-mono text-[12.5px] leading-relaxed">
                   <p className="text-emerald-400">$ {DOCKER_CMD.split("\n")[0]}</p>
                   {DOCKER_CMD.split("\n").slice(1).map((l) => (
                     <p key={l} className="whitespace-pre text-stone-300">
@@ -109,7 +109,7 @@ export function Quickstart() {
           </Reveal>
 
           {/* steps */}
-          <div className="relative flex flex-col">
+          <div className="relative flex min-w-0 flex-col">
             <div
               aria-hidden
               className="absolute bottom-6 left-[22px] top-6 w-px bg-gradient-to-b from-emerald-500/50 via-stone-200 to-transparent"

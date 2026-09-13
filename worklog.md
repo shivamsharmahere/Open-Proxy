@@ -328,3 +328,28 @@ Verification:
 
 Stage Summary:
 - DONE. Site is now overflow-free from 320px to 1440px; fixed elements no longer pan off-screen on phones. Files: endpoint.tsx, pool.tsx, dashboard.tsx, quickstart.tsx, globals.css.
+
+---
+Task ID: 14
+Agent: main (Super Z)
+Task: Update the canonical docker run command site-wide + restructure docs Integration Guides into two connection options (prompt the harness / edit config manually)
+
+Work Log:
+- Canonical command per user: docker run -d --name open-proxy -p 127.0.0.1:8000:8000 -v open-proxy-data:/data ghcr.io/shivamsharmahere/open-proxy:latest
+- openproxy-docs.md: Quick Start docker block updated (old: --name openproxy / -p 8000:8000 / openproxy-data volume / WRONG org ghcr.io/openproxy -> now exact user command, still keeps cargo build-from-source alternative)
+- Integration Guides restructured: intro now explains Option 1 (prompt the harness) vs Option 2 (edit config manually) + universal prompt template in a copyable text block + emerald note callout (GUI-only tools and Claude Code need Option 2/special handling)
+- Per-tool Option 1 tailored prompts (own-config-editing harnesses): Codex CLI (warns about the non-overridable built-in openai provider), OpenCode (global opencode.json), Hermes (config.yaml + verify step), Aider (~/.aider.conf.yml). Each section keeps all original snippets under "Option 2 - Edit the config manually". Bold-paragraph style used deliberately (parser supports h2/h3 only)
+- Quick Reference Table gained "Prompt it?" column (Yes for the 4 agent CLIs, - for GUI/Anthropic-protocol tools)
+- quickstart.tsx landing terminal: DOCKER_CMD updated to the ghcr image + terminal body got nice-scroll overflow-x-auto
+- Regression caught during verify: the 44-char image line gave the quickstart terminal min-content 370px -> implicit grid track inflated (same class as Task 13 endpoint bug, docW would hit 386 at 320px) -> fixed with grid-cols-1 + min-w-0 on both grid children; terminal now scrolls internally if ever needed
+- endpoint.tsx landing: opencode tab snippet corrected to OpenCode's native config shape (package/env/settings, was ai-sdk npm/options shape)
+
+Verification:
+- bun run lint: clean; / and /docs both 200
+- DOM checks: new command present in docs + landing terminal; old ghcr.io/openproxy org gone; Option 1/Option 2 x4 sections + intro (5), universal template rendered, Prompt it? column in table header
+- Overflow sweep after fix: docW == viewport at 320, 360, 390 (full-page scroll pass); docs at 390 clean
+- Desktop 1440: docs Integration Guides section + landing quickstart terminal render correctly (screenshots verify-docs-integration.png, verify-quickstart-cmd.png, verify-quickstart-mobile.png)
+- Console/page errors: none
+
+Stage Summary:
+- DONE. One canonical run command everywhere (ghcr.io/shivamsharmahere/open-proxy:latest); docs Integration Guides now lead with copy-paste "prompt the harness" prompts for Codex/OpenCode/Hermes/Aider with manual config as Option 2. Files: openproxy-docs.md, quickstart.tsx, endpoint.tsx.

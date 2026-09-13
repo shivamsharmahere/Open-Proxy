@@ -24,10 +24,11 @@ OPENPROXY is an OpenAI-compatible reverse proxy that makes NVIDIA NIM's free tie
 ### 1. Run the proxy
 
 ```bash
-# Docker
-docker run -d --name openproxy -p 8000:8000 \
-  -v openproxy-data:/data \
-  ghcr.io/openproxy/open-proxy:latest
+# Docker — the one-liner
+docker run -d --name open-proxy \
+  -p 127.0.0.1:8000:8000 \
+  -v open-proxy-data:/data \
+  ghcr.io/shivamsharmahere/open-proxy:latest
 
 # Or build from source
 cargo build --release
@@ -56,9 +57,45 @@ That's it. Your agent now uses rate-limited NIM models through the proxy.
 
 ## Integration Guides
 
+Every harness can be pointed at OPENPROXY in two ways:
+
+**Option 1 — Prompt the harness (fastest):** agent harnesses (Codex CLI, OpenCode, Hermes, Aider, …) can edit their own configuration. Paste the ready-made prompt from the tool's section below into a fresh session, swap in your `npk_` client key, and the agent wires everything up itself.
+
+**Option 2 — Edit the config manually:** copy the config snippet for your tool into the file it belongs in. Full snippets for every tool follow.
+
+The universal prompt template — works for any tool that speaks OpenAI-compatible endpoints:
+
+```text
+Add a new AI provider called "OpenProxy" to your configuration.
+It is an OpenAI-compatible endpoint:
+- Base URL: http://localhost:8000/v1
+- API key: my npk_... client key (prefer the OPENPROXY_API_KEY
+  environment variable if it exists — never hardcode it)
+- Model ID: deepseek-ai/deepseek-r1
+Set it up the way this tool natively configures custom
+OpenAI-compatible providers, make it the default, then send a
+short test message to verify the connection works.
+```
+
+> **Note:** GUI-only tools (Cursor, Cline, Roo Code, Kilo Code, Windsurf) don't accept prompts for their own provider settings — use Option 2 for those. Claude Code speaks the Anthropic protocol, not OpenAI chat completions, so it needs the special handling described in its section.
+
 ### Codex CLI
 
-**Method:** Environment variables or config file
+**Option 1 — Prompt the harness:** start Codex in your project and paste:
+
+```text
+Set up a custom model provider named "openproxy" in my Codex config.
+It's an OpenAI-compatible endpoint:
+- Base URL: http://localhost:8000/v1
+- API key: read it from the OPENAI_API_KEY environment variable
+  (it's a npk_... client key minted by my local OpenProxy)
+- Default model: deepseek-ai/deepseek-r1
+Remember the built-in "openai" provider can't be overridden — define a
+separate [model_providers.openproxy] block in ~/.codex/config.toml
+instead, make it the default, and run a one-line test request to confirm.
+```
+
+**Option 2 — Edit the config manually:**
 
 **Environment variables (quickest):**
 ```bash
@@ -90,7 +127,22 @@ env_key = "OPENAI_API_KEY"
 
 ### OpenCode
 
-**Method:** Config file (`opencode.json` or `opencode.jsonc`)
+**Option 1 — Prompt the harness:** start OpenCode in your project and paste:
+
+```text
+Add a provider called "openproxy" to my OpenCode config.
+It's an OpenAI-compatible endpoint:
+- Base URL: http://localhost:8000/v1
+- API key: read it from the OPENAI_API_KEY environment variable
+  (a npk_... client key minted by my local OpenProxy)
+- Models: deepseek-ai/deepseek-r1 and meta-llama/llama-3.1-70b-instruct
+Register it in ~/.config/opencode/opencode.json (project-level
+opencode.json if I ask later) the way OpenCode natively registers
+openai-compatible providers, make DeepSeek R1 the default, then run a
+quick test prompt to verify the connection.
+```
+
+**Option 2 — Edit the config manually:**
 
 **Global config (`~/.config/opencode/opencode.json`):**
 ```json
@@ -144,7 +196,20 @@ env_key = "OPENAI_API_KEY"
 
 ### Hermes Agent (Nous Research)
 
-**Method:** Environment variables or config file
+**Option 1 — Prompt the harness:** start Hermes and paste:
+
+```text
+Point yourself at my local OpenProxy gateway — a rate-limit-aware,
+OpenAI-compatible endpoint:
+- Base URL: http://localhost:8000/v1
+- API key: my npk_... client key (use the OPENAI_API_KEY env var)
+- Model: deepseek-ai/deepseek-r1
+Update your provider config (~/.hermes/config.yaml, custom provider
+with context_length 64000) to use it, then verify with a short test
+completion before we continue.
+```
+
+**Option 2 — Edit the config manually:**
 
 **Environment variables:**
 ```bash
@@ -266,7 +331,20 @@ models:
 
 ### Aider
 
-**Method:** Environment variables, CLI flags, or config file
+**Option 1 — Prompt the harness:** launch Aider in your repo and paste:
+
+```text
+Rewire yourself to my local OpenProxy gateway and save it for future
+runs. It's OpenAI-compatible:
+- API base: http://localhost:8000/v1
+- API key: my npk_... client key (OPENAI_API_KEY env var)
+- Model: openai/deepseek-ai/deepseek-r1
+Write the settings into ~/.aider.conf.yml (openai-api-base,
+openai-api-key, model), then run a quick /chat-mode test to confirm
+the endpoint answers.
+```
+
+**Option 2 — Edit the config manually:**
 
 **Environment variables:**
 ```bash
@@ -386,19 +464,19 @@ openai-api-key: npk_...
 
 ## Quick Reference Table
 
-| Tool | Config Method | Base URL Setting | Env Var |
-|---|---|---|---|
-| **Codex CLI** | `~/.codex/config.toml` | `openai_base_url` | `OPENAI_BASE_URL` |
-| **OpenCode** | `opencode.json` | `providers.<id>.settings.baseURL` | — |
-| **Hermes** | `~/.hermes/config.yaml` | `model.base_url` | `OPENAI_BASE_URL` |
-| **Claude Code** | `~/.claude/settings.json` | `env.ANTHROPIC_BASE_URL` | `ANTHROPIC_BASE_URL` |
-| **Cursor** | GUI | Override OpenAI Base URL | — |
-| **Continue.dev** | `~/.continue/config.yaml` | `apiBase` per model | — |
-| **Aider** | `~/.aider.conf.yml` or CLI | `openai-api-base` | `OPENAI_API_BASE` |
-| **Cline** | GUI | Base URL in OpenAI Compatible | — |
-| **Roo Code** | GUI | Base URL in OpenAI Compatible | — |
-| **Kilo Code** | GUI or `kilo.json` | `options.baseURL` | — |
-| **Windsurf** | GUI | Base URL field (version-dependent) | — |
+| Tool | Prompt it? | Config Method | Base URL Setting | Env Var |
+|---|---|---|---|---|
+| **Codex CLI** | Yes | `~/.codex/config.toml` | `openai_base_url` | `OPENAI_BASE_URL` |
+| **OpenCode** | Yes | `opencode.json` | `providers.<id>.settings.baseURL` | — |
+| **Hermes** | Yes | `~/.hermes/config.yaml` | `model.base_url` | `OPENAI_BASE_URL` |
+| **Aider** | Yes | `~/.aider.conf.yml` or CLI | `openai-api-base` | `OPENAI_API_BASE` |
+| **Claude Code** | — | `~/.claude/settings.json` | `env.ANTHROPIC_BASE_URL` | `ANTHROPIC_BASE_URL` |
+| **Cursor** | — | GUI | Override OpenAI Base URL | — |
+| **Continue.dev** | — | `~/.continue/config.yaml` | `apiBase` per model | — |
+| **Cline** | — | GUI | Base URL in OpenAI Compatible | — |
+| **Roo Code** | — | GUI | Base URL in OpenAI Compatible | — |
+| **Kilo Code** | — | GUI or `kilo.json` | `options.baseURL` | — |
+| **Windsurf** | — | GUI | Base URL field (version-dependent) | — |
 
 ---
 
