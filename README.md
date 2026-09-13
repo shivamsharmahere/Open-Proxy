@@ -40,6 +40,16 @@ n8n       ┘    │             ├─► openrouter.ai/api/v1       (OpenRoute
 
 The more keys you add, the higher your combined throughput: 3 NIM keys (120 RPM) + 5 OpenRouter keys (200 RPM) = **320 RPM** total, automatically distributed. Each key holds to its own upstream's limit; the proxy just makes agents patient enough to live within the budget. Load-tested to prove it: 100 concurrent clients, zero upstream rate violations.
 
+## Contents
+
+[Requirements](#requirements) · [Quick start](#quick-start) · [Client recipes](#client-recipes) · [The dashboard](#the-dashboard) · [How it works](#how-it-works) · [Configuration](#configuration) · [Security & deployment](#security--deployment) · [Operations](#operations) · [Testing](#testing) · [Upgrading](#upgrading) · [FAQ & limitations](#faq--limitations) · [Contributing](#contributing)
+
+## Requirements
+
+- **Docker** (Engine 24+ or any compatible runtime, rootless Podman included) — or nothing at all: it's also a single static binary you can `cargo run --release`.
+- **One or more provider API keys** (NVIDIA NIM, OpenRouter, TokenRouter, OpenAI, or any OpenAI-compatible endpoint).
+- Runs on **amd64 and arm64** (Apple Silicon, Raspberry Pi, ARM VPSes included). The image is ~5 MB, `FROM scratch`, and needs no volumes other than the one it creates for its data.
+
 ## Quick start
 
 **1. Get API keys.** Sign up with any supported provider and grab an API key:
@@ -54,15 +64,16 @@ The more keys you add, the higher your combined throughput: 3 NIM keys (120 RPM)
 
 You'll paste keys into the setup wizard — never into a file. Add as many providers and keys as you like; they all merge into one pool.
 
-**2. Run the proxy.** The image is multi-arch, ~5 MB, with hardened defaults and persistent history:
+**2. Run the proxy.** One command:
 
 ```sh
-docker build -t open-proxy .
 docker run -d --name open-proxy -p 127.0.0.1:8000:8000 -v open-proxy-data:/data \
-  open-proxy
+  ghcr.io/shivamsharmahere/open-proxy:latest
 ```
 
-With a checkout you can also use compose (`docker compose up -d --build`), or skip Docker entirely (`cargo run --release`). The `.env` file is optional and holds only container-level vars — see [Configuration](#configuration).
+That's a multi-arch image (~5 MB), hardened by default (`read_only`, non-root, `cap_drop: ALL`, no shell inside), cosign-signed at release, with all config and history persisted on the `open-proxy-data` volume — so upgrades are stop/pull/start and nothing is lost.
+
+Prefer building from source? With a checkout: `docker build -t open-proxy .` then the same `docker run` pointing at `open-proxy` — or use compose (`docker compose up -d --build`), or skip Docker entirely (`cargo run --release`). The `.env` file is optional and holds only container-level vars — see [Configuration](#configuration).
 
 ```
    ___  ___ ___ _  _   ___ ___  _____  ____   __
@@ -375,14 +386,16 @@ python3 scripts/loadtest.py --clients 100 --requests 3
 
 It exits non-zero on any client-visible failure or a single upstream rate violation, and reports worker exhaustions + peak per-model concurrency. See [`knowledge/testing/test-strategy.md`](knowledge/testing/test-strategy.md) for the full strategy and [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow.
 
-## Upgrading to 0.6.6
+## Upgrading
 
 Back up the data volume before upgrading; it contains `config.json`, API
 keys, password hashes, and client API-key digests. Then pull and restart as
-usual (`docker compose pull && docker compose up -d`, or replace the image in
-your existing `docker run` deployment).
+usual (`docker compose pull && docker compose up -d`, or stop/`docker pull`/start
+on your existing `docker run` deployment — the volume carries everything).
 
-0.6.6 intentionally starts dashboard history over in the canonical
+**0.6.7** has no special upgrade steps: a fix release (per-model retrieve now answers from the merged catalog), no schema or metric-contract changes beyond a documented label correction.
+
+**0.6.6** intentionally started dashboard history over in the canonical
 `DATA_DIR/history-v1.jsonl` format. It does not read, rename, truncate, migrate,
 or delete the experimental `DATA_DIR/history.jsonl`; the old file remains
 available for rollback and may be removed manually after you no longer need
@@ -417,16 +430,22 @@ production locale is `en-US`; the generated `en-XA` pseudolocale is test-only.
 
 The `knowledge/` directory holds the project's long-term memory — design decisions with their reasoning, research about upstream providers, per-component architecture notes, and runbooks, all cross-linked markdown. Start at [`knowledge/index.md`](knowledge/index.md). [`AGENTS.md`](AGENTS.md) tells AI agents how to maintain it.
 
-## Contributing, security & support
+## Contributing
 
-- **Contributing** — PRs welcome; read [CONTRIBUTING.md](CONTRIBUTING.md)
-  first (build/test commands, the knowledge-base rules, and the zero-warning
-  bar). For anything beyond a small fix, open an issue before writing code.
-- **Security** — report vulnerabilities privately via
-  [SECURITY.md](SECURITY.md), never in a public issue.
-- **Support** — questions go to
-  [Discussions](https://github.com/shivamsharmahere/Open-Proxy/discussions); see
-  [SUPPORT.md](SUPPORT.md) for the routing map.
+Contributions are very welcome — bug reports, docs, tests, and features alike.
+
+1. **Start small or start loud.** For a typo, doc fix, or small bug, a PR straight away is fine. For a feature or anything behavioral, open an issue first so we can agree on scope.
+2. **Set up** — clone, `cargo test` (unit + e2e, no services needed; the e2e suite runs a real binary against a scripted mock upstream). Rust 1.87+ via the pinned toolchain file.
+3. **The bar** — zero warnings, new behavior lands with a failing-test-first regression check, and docs/knowledge are updated in the same change. [CONTRIBUTING.md](CONTRIBUTING.md) has the full workflow; [`AGENTS.md`](AGENTS.md) explains the repo's conventions for AI-assisted work.
+4. **Review** — every PR gets a real review; CI (tests, fmt, clippy, CodeQL, cargo-deny) must be green.
+
+Questions and ideas belong in [Discussions](https://github.com/shivamsharmahere/Open-Proxy/discussions) — if you're unsure whether something is a bug, that's the place.
+
+## Support
+
+- **Security** — report vulnerabilities privately via [SECURITY.md](SECURITY.md), never in a public issue.
+- **Bugs & features** — [Issues](https://github.com/shivamsharmahere/Open-Proxy/issues).
+- **Questions** — [Discussions](https://github.com/shivamsharmahere/Open-Proxy/discussions); see [SUPPORT.md](SUPPORT.md) for the routing map.
 
 ## License
 
